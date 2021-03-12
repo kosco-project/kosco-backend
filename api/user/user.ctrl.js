@@ -12,45 +12,27 @@ exports.find = async (req, res) => {
     const { recordset, rowsAffected } = await pool.request()
       .query`select EmpNo, EmpNm from dbo.GMSTUSER where EmpNo=${userId} and PassWord=${userPw} and OutDt=''`;
 
-    console.log(recordset, rowsAffected);
-
     if (!rowsAffected[0]) {
       res.send({ message: 'find fail', error: '존재하지 않은 사용자입니다.' });
       return;
     }
 
-    // const token = jwt.sign(
-    //   {
-    //     userId: recordset[0].EmpNo,
-    //     userPw: recordset[0].EmpNm,
-    //   },
-    //   process.env.JWT_SECRET,
-    //   { expiresIn: '7d' }
-    // );
-
-    // res.send({ message: 'find success', token });
+    req.session.userId = recordset[0].EmpNo;
+    req.session.userPw = recordset[0].EmpNm;
   } catch (e) {
     console.error(e);
     res.status(500).send();
   }
+  res.send({ message: 'find success' });
 };
 
-exports.check = (req, res) => {
-  console.log(req, res);
-  // try {
-  //   jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
-  //   res.send({ message: 'check success' });
-  // } catch (e) {
-  //   if (e.name === 'TokenExpiredError') {
-  //     return res.status(419).json({
-  //       code: 419,
-  //       message: 'fail check',
-  //     });
-  //   }
+exports.check = async (req, res) => {
+  try {
+    console.log(req.headers);
+  } catch (e) {
+    console.error(e);
+    res.status(500).send();
+  }
 
-  //   return res.send({
-  //     code: 401,
-  //     message: 'fail check',
-  //   });
-  // }
+  res.send({ message: 'find success' });
 };

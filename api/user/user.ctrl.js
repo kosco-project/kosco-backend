@@ -16,9 +16,9 @@ exports.find = async (req, res) => {
       res.send({ message: 'find fail', error: '존재하지 않은 사용자입니다.' });
       return;
     }
-
+    console.log(req);
     req.session.userId = recordset[0].EmpNo;
-    req.session.userPw = recordset[0].EmpNm;
+    req.session.userNm = recordset[0].EmpNm;
   } catch (e) {
     console.error(e);
     res.status(500).send();

@@ -4,7 +4,9 @@ const path = require('path');
 const morgan = require('morgan');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 const api = require('./api');
+const { JsonWebTokenError } = require('jsonwebtoken');
 
 require('dotenv').config();
 // node_modules에서 express 모듈을 활용한다.
@@ -32,19 +34,18 @@ app.use(express.urlencoded({ extended: true })); // true면 qs, false면 queryst
 app.use(cookieParser(process.env.COOKIE_ID));
 
 // session 기본 설정
-app.use(
-  session({
-    resave: false,
-    saveUninitialized: true,
-    secret: process.env.SESSION_ID,
-    cookie: {
-      httpOnly: true,
-    },
-  })
-);
+// app.use(
+//   session({
+//     resave: false,
+//     saveUninitialized: true,
+//     secret: process.env.SESSION_ID,
+//     cookie: {
+//       httpOnly: true,
+//     },
+//   })
+// );
 
 app.use('/api', api);
-
 app.use(express.static(path.join(__dirname, 'public')));
 
 // express 서버를 실행할 때 필요한 포트 정의와 실행 시 callback 함수를 받는다.

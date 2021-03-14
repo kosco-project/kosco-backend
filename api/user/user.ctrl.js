@@ -1,6 +1,6 @@
 const sql = require('mssql');
-// const jwt = require('jsonwebtoken');
-const config = require('../../lib/dbConfig');
+const jwt = require('jsonwebtoken');
+const config = require('../../lib/configDB');
 
 require('dotenv').config();
 
@@ -16,23 +16,33 @@ exports.find = async (req, res) => {
       res.send({ message: 'find fail', error: '존재하지 않은 사용자입니다.' });
       return;
     }
-    console.log(req);
-    req.session.userId = recordset[0].EmpNo;
-    req.session.userNm = recordset[0].EmpNm;
+    const token = jwt.sign(
+      {
+        userId: recordset[0].EmpNo,
+        userNm: recordset[0].EmpNm,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' },
+    );
+    res.send({ message: 'find success', token });
+
+    // console.log(req);
+    // req.session.userId = recordset[0].EmpNo;
+    // req.session.userNm = recordset[0].EmpNm;
   } catch (e) {
     console.error(e);
     res.status(500).send();
   }
-  res.send({ message: 'find success' });
+  // res.send({ message: 'find success' });
 };
 
-exports.check = async (req, res) => {
+exports.check = (req, res) => {
   try {
-    console.log(req.headers);
+    jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
+    req.send({ message: 'check success' });
   } catch (e) {
     console.error(e);
     res.status(500).send();
   }
-
-  res.send({ message: 'find success' });
+  // res.send({ message: 'check success' });
 };

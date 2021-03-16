@@ -6,6 +6,7 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const api = require('./api');
+const cors = require('cors');
 const { JsonWebTokenError } = require('jsonwebtoken');
 
 require('dotenv').config();
@@ -26,6 +27,8 @@ require('dotenv').config();
 
 // 서버에 변수를 만듦 port = 3000
 app.set('port', process.env.PORT || 3050);
+
+app.use(cors({ origin: 'http://localhost:3000/' }));
 
 // 클라이언트에서 json data를 보냈을 때 json body를 파싱해서 req body로 넣어준다.
 app.use(express.json());

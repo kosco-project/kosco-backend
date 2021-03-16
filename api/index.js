@@ -5,8 +5,10 @@ const router = express.Router();
 
 const user = require('./user');
 const inspectionList = require('./inspectionList');
+const inspectionDocs = require('./inspectionDocs');
 
 router.use('/user', user);
 router.use('/inspectionList', inspectionList);
+router.use('/doc/:docType', inspectionDocs);
 
 module.exports = router;

@@ -22,7 +22,7 @@ exports.find = async (req, res) => {
         userNm: recordset[0].EmpNm,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' },
+      { expiresIn: '7d' }
     );
     res.send({ message: 'find success', token });
 

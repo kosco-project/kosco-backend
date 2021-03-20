@@ -1,9 +1,9 @@
-// const express = require('express');
-// const inspectionDocsCtrl = require('./inspectionDocs.ctrl');
+const express = require('express');
+const A1A2 = require('./A1A2.ctrl');
 
-// const router = express.Router();
+const router = express.Router();
 
-// router.post('/save', inspectionDocsCtrl.save);
-// router.post('/complete', inspectionDocsCtrl.complete);
+router.post('/:category/save', A1A2.save);
+// router.post('/:category/complete', A1A2.complete);
 
-// module.exports = router;
+module.exports = router;

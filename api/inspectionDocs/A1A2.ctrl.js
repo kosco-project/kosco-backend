@@ -41,7 +41,7 @@ exports.save = async (req, res) => {
           .query(`insert GSVC_${category}_H(CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(@CERTNO, @CERTDT, @VESSELNM, @ID, @ID)`);
 
         // D2
-        await D2.forEach((value, i) =>
+        await Object.values(D2).forEach((value, i) =>
           pool
             .request()
             .input('input_parameter', sql.NChar, category)
@@ -62,7 +62,7 @@ exports.save = async (req, res) => {
           .query(`update GSVC_${category}_H set UP_ID = @ID, UP_DT = @date`);
 
         // D2
-        await D2.forEach((value, i) =>
+        await Object.values(D2).forEach((value, i) =>
           pool
             .request()
             .input('input_parameter', sql.NChar, category)

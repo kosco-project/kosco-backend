@@ -6,6 +6,7 @@ require('dotenv').config();
 
 exports.find = async (req, res) => {
   const { userId, userPw } = req.body;
+  // const tokenExpire = new Date(jwt.decode(req.headers.token).exp * 1000).toUTCString();
 
   try {
     const pool = await sql.connect(config);

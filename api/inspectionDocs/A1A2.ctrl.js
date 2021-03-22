@@ -6,9 +6,10 @@ require('dotenv').config();
 require('date-utils');
 
 exports.save = async (req, res) => {
+  const ID = jwt.decode(req.headers.token).userId;
   const { category } = req.params;
-  const { H, D1 } = req.body;
-  const { CERTDT, VESSELNM, ID } = H;
+  const { H, D1, D2 } = req.body;
+  const { CERTDT, VESSELNM } = H;
   const date = new Date();
 
   const pool = await sql.connect(config);
@@ -29,7 +30,7 @@ exports.save = async (req, res) => {
     `);
 
       if (!CERTNO.length) {
-        const result1 = await pool
+        await pool
           .request()
           .input('input_parameter', sql.NChar, category)
           .input('CERTNO', sql.NChar, recordset[0][''])
@@ -39,7 +40,17 @@ exports.save = async (req, res) => {
           .input('ID', sql.NChar, ID)
           .query(`insert GSVC_${category}_H(CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(@CERTNO, @CERTDT, @VESSELNM, @ID, @ID)`);
 
-        console.log(result1);
+        // D2
+        await D2.forEach((value, i) =>
+          pool
+            .request()
+            .input('input_parameter', sql.NChar, category)
+            .input('CERTNO', sql.NChar, recordset[0][''])
+            .input('CERTSEQ', sql.NChar, i + 1)
+            .input('Value', sql.NChar, value)
+            .input('ID', sql.NChar, ID)
+            .query(`insert GSVC_${category}_D2(CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, @CERTSEQ, @Value, @ID, @ID)`)
+        );
 
         res.status(200).send();
       } else {
@@ -49,6 +60,18 @@ exports.save = async (req, res) => {
           .input('ID', sql.NChar, ID)
           .input('date', sql.DateTimeOffset, date)
           .query(`update GSVC_${category}_H set UP_ID = @ID, UP_DT = @date`);
+
+        // D2
+        await D2.forEach((value, i) =>
+          pool
+            .request()
+            .input('input_parameter', sql.NChar, category)
+            .input('CERTSEQ', sql.NChar, i + 1)
+            .input('Value', sql.NChar, value)
+            .input('ID', sql.NChar, ID)
+            .input('date', sql.DateTimeOffset, date)
+            .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`)
+        );
 
         res.status(200).send();
       }

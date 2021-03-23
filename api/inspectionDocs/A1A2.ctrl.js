@@ -6,7 +6,8 @@ require('dotenv').config();
 require('date-utils');
 
 exports.save = async (req, res) => {
-  const ID = jwt.decode(req.headers.token).userId;
+  const token = req.headers.authorization.slice(7);
+  const ID = jwt.decode(token).userId;
   const { category } = req.params;
   const { H, D1, D2 } = req.body;
   const { CERTDT, VESSELNM } = H;
@@ -27,6 +28,10 @@ exports.save = async (req, res) => {
       // }, ${ID}, ${new Date().toFormat('YYYY-MM-DD')}, ${ID}, ${new Date().toFormat('YYYY-MM-DD')})`;
       const { recordset: CERTNO } = await pool.request().input('input_parameter', sql.NChar, category).query(`
       SELECT CERTNO from GSVC_${category}_H
+    `);
+
+      const { recordset: D2DATA } = await pool.request().input('input_parameter', sql.NChar, category).query(`
+      SELECT Value from GSVC_${category}_D2  
     `);
 
       if (!CERTNO.length) {
@@ -62,16 +67,18 @@ exports.save = async (req, res) => {
           .query(`update GSVC_${category}_H set UP_ID = @ID, UP_DT = @date`);
 
         // D2
-        await Object.values(D2).forEach((value, i) =>
-          pool
-            .request()
-            .input('input_parameter', sql.NChar, category)
-            .input('CERTSEQ', sql.NChar, i + 1)
-            .input('Value', sql.NChar, value)
-            .input('ID', sql.NChar, ID)
-            .input('date', sql.DateTimeOffset, date)
-            .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`)
-        );
+        await Object.values(D2).forEach((value, i) => {
+          if (+D2DATA[i].Value !== value) {
+            pool
+              .request()
+              .input('input_parameter', sql.NChar, category)
+              .input('CERTSEQ', sql.NChar, i + 1)
+              .input('Value', sql.NChar, value)
+              .input('ID', sql.NChar, ID)
+              .input('date', sql.DateTimeOffset, date)
+              .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`);
+          }
+        });
 
         res.status(200).send();
       }

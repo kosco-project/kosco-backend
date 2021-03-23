@@ -14,11 +14,13 @@
   "dependencies": {
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
+    "date-utils": "^1.2.21",
     "dotenv": "^8.2.0",
     "eslint-config-airbnb": "^18.2.1",
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "jsonwebtoken": "^8.5.1",
+    "jwt-decode": "^3.1.2",
     "morgan": "^1.10.0",
     "mssql": "^6.3.1",
     "nodemon": "^2.0.7",

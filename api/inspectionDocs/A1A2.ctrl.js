@@ -32,6 +32,10 @@ exports.save = async (req, res) => {
       SELECT CERTNO from GSVC_${category}_H
     `);
 
+      const { recordset: D2DATA } = await pool.request().input('input_parameter', sql.NChar, category).query(`
+      SELECT Value from GSVC_${category}_D2  
+    `);
+
       if (!CERTNO.length) {
         await pool
           .request()
@@ -92,16 +96,18 @@ exports.save = async (req, res) => {
           }
         });
         // D2
-        await Object.values(D2).forEach((value, i) =>
-          pool
-            .request()
-            .input('input_parameter', sql.NChar, category)
-            .input('CERTSEQ', sql.NChar, i + 1)
-            .input('Value', sql.NChar, value)
-            .input('ID', sql.NChar, ID)
-            .input('date', sql.DateTimeOffset, date)
-            .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`)
-        );
+        await Object.values(D2).forEach((value, i) => {
+          if (+D2DATA[i].Value !== value) {
+            pool
+              .request()
+              .input('input_parameter', sql.NChar, category)
+              .input('CERTSEQ', sql.NChar, i + 1)
+              .input('Value', sql.NChar, value)
+              .input('ID', sql.NChar, ID)
+              .input('date', sql.DateTimeOffset, date)
+              .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`);
+          }
+        });
 
         res.status(200).send();
       }

@@ -5,9 +5,9 @@ const morgan = require('morgan');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 const api = require('./api');
 const { JsonWebTokenError } = require('jsonwebtoken');
-const cors = require('cors');
 
 require('dotenv').config();
 // node_modules에서 express 모듈을 활용한다.

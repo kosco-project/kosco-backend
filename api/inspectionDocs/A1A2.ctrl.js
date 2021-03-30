@@ -10,97 +10,66 @@ exports.save = async (req, res) => {
   const ID = jwt.decode(token).userId;
   const { category } = req.params;
   const { H, D1, D2 } = req.body;
-  const { CERTNO, VESSELNM } = H;
+  const { VESSELNM } = H;
+  const CERTDT = new Date().toFormat('YYYYMMDD');
 
   const pool = await sql.connect(config);
+  const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
 
   if (category === 'A1' || category === 'A2') {
     try {
-      const { recordset: CERT_NO } = await pool.request().input('category', sql.NChar, category).query(`
-      SELECT CERTNO from GSVC_${category}_H
-    `);
-      const { recordset: D2DATA } = await pool.request().input('input_parameter', sql.NChar, category).query(`
-        SELECT Value from GSVC_${category}_D2  
+      await pool.request().input('category', sql.NChar, category).input('CERTNO', sql.NChar, CERTNO[0]['']).query(`
+      MERGE INTO GSVC_${category}_H
+        USING(values (1))
+          AS Source (Number)
+          ON (CERTNO = @CERTNO)
+        WHEN MATCHED THEN
+         UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
+        WHEN NOT MATCHED THEN
+          insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(@CERTNO, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `);
 
-      if (!CERT_NO.length) {
-        await pool
-          .request()
-          .input('category', sql.NChar, category)
-          .input('CERTNO', sql.NChar, CERTNO)
-          .input('CERTDT', sql.NChar, new Date().toFormat('YYYYMMDD'))
-          .input('VESSELNM', sql.NChar, VESSELNM)
-          .input('ID', sql.NChar, ID)
-          .query(`insert GSVC_${category}_H(CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(@CERTNO, @CERTDT, @VESSELNM, @ID, @ID)`);
-
-        Object.values(D1).forEach(async (v, i) => {
-          await pool
-            .request()
-            .input('ID', sql.NChar, ID)
-            .input('category', sql.NChar, category)
-            .input('CERTNO', sql.NChar, CERTNO)
-            .input('value', sql.NChar, v)
-            .query(`insert GSVC_${category}_D1(CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, ${i + 1}, @value, @ID, @ID)`);
-        });
-        // D2
-        Object.values(D2).forEach(async (value, i) => {
-          await pool
-            .request()
-            .input('input_parameter', sql.NChar, category)
-            .input('CERTNO', sql.NChar, CERTNO)
-            .input('CERTSEQ', sql.NChar, i + 1)
-            .input('Value', sql.NChar, value)
-            .input('ID', sql.NChar, ID)
-            .query(`insert GSVC_${category}_D2(CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, @CERTSEQ, @Value, @ID, @ID)`);
-        });
-
-        res.status(200).send();
-      } else {
+      Object.values(D1).forEach(async (v, i) => {
         await pool
           .request()
           .input('category', sql.NChar, category)
           .input('ID', sql.NChar, ID)
-          .input('date', sql.DateTimeOffset, new Date())
-          .query(`update GSVC_${category}_H set UP_ID = @ID, UP_DT = @date`);
-
-        const { recordset: D1DATA } = await pool.request().input('category', sql.NChar, category).query(`
-          SELECT Value from GSVC_${category}_D1
+          .input('CERTSEQ', sql.NChar, i + 1)
+          .input('CERTNO', sql.NChar, CERTNO[0][''])
+          .input('value', sql.NChar, v).query(`
+          MERGE INTO GSVC_${category}_D1
+            USING(values (1))
+              AS Source (Number)
+            ON (CERTNO = @CERTNO)
+              WHEN MATCHED AND (Value != @value AND CERTSEQ = @CERTSEQ) THEN
+                UPDATE SET Value = @value, UP_ID = @ID, UP_DT = getDate()
+              WHEN NOT MATCHED THEN
+                insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
         `);
+      });
 
-        Object.values(D1).forEach(async (v, i) => {
-          if (D1DATA[i].Value === v) {
-            await pool
-              .request()
-              .input('ID', sql.NChar, ID)
-              .input('date', sql.DateTimeOffset, new Date())
-              .input('certseq', sql.NChar, i + 1)
-              .input('category', sql.NChar, category)
-              .input('value', sql.NChar, v).query(`
-              select * from GSVC_${category}_D1 where CERTSEQ = @certseq
-              update GSVC_${category}_D1 set UP_ID = @ID, UP_DT = @date, Value = @value where CERTSEQ = @certseq
-              `);
-          }
-        });
-        // D2
+      Object.values(D2).forEach(async (v, i) => {
+        await pool
+          .request()
+          .input('category', sql.NChar, category)
+          .input('ID', sql.NChar, ID)
+          .input('CERTSEQ', sql.NChar, i + 1)
+          .input('CERTNO', sql.NChar, CERTNO[0][''])
+          .input('value', sql.NChar, v).query(`
+          MERGE INTO GSVC_${category}_D2
+            USING(values (1))
+              AS Source (Number)
+            ON (CERTNO = @CERTNO)
+              WHEN MATCHED AND (Value != @value AND CERTSEQ = @CERTSEQ) THEN
+                UPDATE SET Value = @value, UP_ID = @ID, UP_DT = getDate()
+              WHEN NOT MATCHED THEN
+                insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
+        `);
+      });
 
-        await Object.values(D2).forEach((value, i) => {
-          if (+D2DATA[i].Value !== value) {
-            pool
-              .request()
-              .input('input_parameter', sql.NChar, category)
-              .input('CERTSEQ', sql.NChar, i + 1)
-              .input('Value', sql.NChar, value)
-              .input('ID', sql.NChar, ID)
-              .input('date', sql.DateTimeOffset, new Date())
-              .query(`update GSVC_${category}_D2 set Value = @Value, UP_ID = @ID, UP_DT = @date where CERTSEQ = @CERTSEQ`);
-          }
-        });
-
-        res.status(200).send();
-      }
       res.status(200).send();
     } catch (e) {
-      console.error(e);
+      console.log(e);
       res.status(500).send();
     }
   }

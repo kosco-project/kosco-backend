@@ -8,9 +8,8 @@ require('date-utils');
 exports.save = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;
-  const { H, D1, D2 } = req.body;
+  const { H, D1, D2, D3 } = req.body;
   const { VESSELNM } = H;
-  const date = new Date();
   const CERTDT = new Date().toFormat('YYYYMMDD');
 
   const pool = await sql.connect(config);
@@ -19,7 +18,7 @@ exports.save = async (req, res) => {
 
   try {
     await pool.request().query`
-      merge into GSVC_A3_H
+      merge into GSVC_B3_H
       using(values (1))
         as Source (Number)
         on (CERTNO = ${CERTNO[0]['']})
@@ -31,7 +30,7 @@ exports.save = async (req, res) => {
 
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
-        merge into GSVC_A3_D1
+        merge into GSVC_B3_D1
         using(values (1))
           as Source (Number)
           on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
@@ -45,18 +44,34 @@ exports.save = async (req, res) => {
     });
 
     Object.values(D2).forEach(async (v, i) => {
-      await pool.request().query`merge into GSVC_A3_D2 
-      using(values (1)) 
-        as Source (Number)
-        on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-      when matched and (CarriedOut != ${v.carriedOut.toString()} or NotCarried != ${v.notCarried.toString()} or Remark != ${v.remarks}) then 
-        update set CarriedOut = ${v.carriedOut}, NotCarried = ${v.notCarried}, Remark = ${v.remarks}, UP_ID = ${ID}, UP_DT = GetDate() 
-      when not matched then
-        insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.carriedOut}, ${v.notCarried}, ${
-        v.remarks
-      }, ${ID}, ${ID});
-  `;
+      await pool.request().query`merge into GSVC_B3_D2
+        using(values (1))
+          as Source (Number)
+          on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
+        when matched and (CarriedOut != ${v.carriedOut.toString()} or NotCarried != ${v.notCarried.toString()} or NotApp != ${v.notApplicable.toString()} or Comm != ${
+        v.Comm
+      }) then
+          update set CarriedOut = ${v.carriedOut}, NotCarried = ${v.notCarried}, NotApp = ${v.notApplicable}, Comm = ${
+        v.Comm
+      }, UP_ID = ${ID}, UP_DT = GetDate()
+        when not matched then
+          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.carriedOut}, ${
+        v.notCarried
+      }, ${v.notApplicable}, ${v.Comm}, ${ID}, ${ID});
+      `;
     });
+
+    await pool.request().query`
+      merge into GSVC_B3_D3
+      using (values(1))
+        as Source (Number)
+        on (CERTNO = ${CERTNO[0]['']})
+      when matched and (Value1 != ${D3[0]} or Value2 != ${D3[1]} or Value3 != ${D3[2]}) then
+        update set Value1 = ${D3[0]}, Value2 = ${D3[1]}, Value3 = ${D3[2]}, UP_ID = ${ID}, UP_DT = GetDate()
+      when not matched then
+        insert (CERTNO, CERTSEQ, Value1, Value2, Value3, IN_ID, UP_ID) values(${CERTNO[0]['']}, 1, ${D3[0]}, ${D3[1]}, ${D3[2]}, ${ID}, ${ID});
+      `;
+
     res.status(200).send();
   } catch (e) {
     console.error(e);

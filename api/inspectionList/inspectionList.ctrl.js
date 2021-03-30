@@ -14,8 +14,9 @@ exports.find = async (req, res) => {
 
   try {
     const pool = await sql.connect(config);
-    const { recordset } = process === '1'
-      ? await pool.request().query`
+    const { recordset } =
+      process === '1'
+        ? await pool.request().query`
       SELECT dbo.GD_F_CUSTNM(H.CUSTCD) AS CUSTNM
       ,H.RCVDT
       ,(SELECT S.SHIPNM FROM GMSTSHIP S WHERE S.SHIPNO = H.SHIPNO) AS SHIPNM
@@ -34,7 +35,8 @@ exports.find = async (req, res) => {
       AND ISNULL(R.RESULT_GB,'') LIKE '%'
       ORDER BY CUSTNM, RCVDT
       `
-      : process === '2' ? await pool.request().query`
+        : process === '2'
+        ? await pool.request().query`
       SELECT dbo.GD_F_CUSTNM(H.CUSTCD) AS CUSTNM
         ,H.RCVDT
         ,(SELECT S.SHIPNM FROM GMSTSHIP S WHERE S.SHIPNO = H.SHIPNO) AS SHIPNM
@@ -53,7 +55,8 @@ exports.find = async (req, res) => {
         AND ISNULL(R.RESULT_GB,'') LIKE '%'
         AND C.MAGAMYN = '0'
         ORDER BY CUSTNM, RCVDT
-      ` : await pool.request().query`
+      `
+        : await pool.request().query`
       SELECT dbo.GD_F_CUSTNM(H.CUSTCD) AS CUSTNM
         ,H.RCVDT
         ,(SELECT S.SHIPNM FROM GMSTSHIP S WHERE S.SHIPNO = H.SHIPNO) AS SHIPNM
@@ -83,12 +86,13 @@ exports.find = async (req, res) => {
 
 // 단위 응답
 exports.units = async (req, res) => {
+  const token = req.headers.authorization.slice(7);
   try {
     const pool = await sql.connect(config);
     const { recordset } = await pool.request().query`
       select * from gmstcode where cd like 'bs06%' and lvl = '2' and useyn = '1' 
     `;
-    jwt.verify(req.headers.token, process.env.JWT_SECRET);
+    jwt.verify(token, process.env.JWT_SECRET);
 
     res.send({ message: 'find success', units: recordset });
   } catch (error) {

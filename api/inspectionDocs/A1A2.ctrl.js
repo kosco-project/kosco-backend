@@ -10,15 +10,25 @@ exports.save = async (req, res) => {
   const ID = jwt.decode(token).userId;
   const { category } = req.params;
   const { H, D1, D2 } = req.body;
-  const { VESSELNM } = H;
+  const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
 
   const pool = await sql.connect(config);
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
+  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
+  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   if (category === 'A1' || category === 'A2') {
     try {
-      await pool.request().input('category', sql.NChar, category).input('CERTNO', sql.NChar, CERTNO[0]['']).query(`
+      // GRCV_CT 테이블에서 CERT_NO 삽입
+      await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RcvNo})
+      `;
+
+      // GSVC 테이블에 데이터 삽입
+      await pool.request().input('category', sql.NChar, category).input('VESSELNM', sql.NChar, VESSELNM).input('CERTNO', sql.NChar, CERTNO[0][''])
+        .query(`
       MERGE INTO GSVC_${category}_H
         USING(values (1))
           AS Source (Number)
@@ -26,7 +36,7 @@ exports.save = async (req, res) => {
         WHEN MATCHED THEN
          UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
-          insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(@CERTNO, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(@CERTNO, ${CERTDT}, @VESSELNM, ${ID}, ${ID});
       `);
 
       Object.values(D1).forEach(async (v, i) => {
@@ -44,7 +54,7 @@ exports.save = async (req, res) => {
               WHEN MATCHED AND (Value != @value AND CERTSEQ = @CERTSEQ) THEN
                 UPDATE SET Value = @value, UP_ID = @ID, UP_DT = getDate()
               WHEN NOT MATCHED THEN
-                insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
+                INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
         `);
       });
 
@@ -63,7 +73,7 @@ exports.save = async (req, res) => {
               WHEN MATCHED AND (Value != @value AND CERTSEQ = @CERTSEQ) THEN
                 UPDATE SET Value = @value, UP_ID = @ID, UP_DT = getDate()
               WHEN NOT MATCHED THEN
-                insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
+                INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(@CERTNO, ${i + 1}, @value, ${ID}, ${ID});
         `);
       });
 

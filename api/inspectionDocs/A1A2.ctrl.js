@@ -23,7 +23,7 @@ exports.save = async (req, res) => {
       // GRCV_CT 테이블에서 CERT_NO 삽입
       await pool.request().query`
         UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo})
+        WHERE (RcvNo = ${RcvNo} AND Doc_No = ${category})
       `;
 
       // GSVC 테이블에 데이터 삽입

@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.post('/A3/inspection/:type', A3.inspection);
 router.post('/B1/save', B1.save);
-router.post('/B3/save', B3.save);
+router.post('/B3/inspection/:type', B3.inspection);
 
 router.post('/:category/save', A1A2.save);
 router.post('/:category/complete', A1A2.complete);

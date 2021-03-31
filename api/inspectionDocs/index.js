@@ -14,7 +14,6 @@ router.post('/B1/save', B1.save);
 router.post('/B3/inspection/:type', B3.inspection);
 router.post('/C/inspection/:type', C.inspection);
 
-router.post('/:category/save', A1A2.save);
-router.post('/:category/complete', A1A2.complete);
+router.post('/:category/:type', A1A2.inspection);
 
 module.exports = router;

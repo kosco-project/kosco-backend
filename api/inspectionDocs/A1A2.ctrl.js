@@ -20,7 +20,7 @@ const updateQuery = async (table, data, category, CERTNO, ID, VESSELNM, CERTDT) 
       MERGE INTO GSVC_${category}_H
         USING(values (1))
           AS Source (Number)
-          ON (CERTNO = @CERTNO)
+          ON (CERTNO IS NOT NULL)
         WHEN MATCHED THEN
          UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
@@ -37,6 +37,14 @@ const updateQuery = async (table, data, category, CERTNO, ID, VESSELNM, CERTDT) 
     `);
   });
 };
+
+// SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, UP_ID, UP_DT
+// WHEN NOT MATCHED THEN
+// INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, UP_ID, UP_DT) VALUES(${
+//   CERTNO[0]['']
+// }, 1, ${v.GasType}, ${v.SerialNo}, ${v.TestDt}, ${'sdf'}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${v.Temp}, ${
+// v.Perform
+// }, ${123}, ${'sdf'}
 
 exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);

@@ -7,7 +7,7 @@ const B3 = require('./B3.ctrl');
 
 const router = express.Router();
 
-router.post('/A3/save', A3.save);
+router.post('/A3/inspection/:type', A3.inspection);
 router.post('/B1/save', B1.save);
 router.post('/B3/save', B3.save);
 

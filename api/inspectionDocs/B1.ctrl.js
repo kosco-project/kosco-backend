@@ -5,42 +5,68 @@ const config = require('../../lib/configDB');
 require('dotenv').config();
 require('date-utils');
 
-exports.save = async (req, res) => {
+exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;
   const { H, D1 } = req.body;
-  const { CERTNO, VESSELNM } = H;
+  const { type } = req.params;
+  const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
+  console.log(new Date());
 
   const pool = await sql.connect(config);
+  const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
+  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
+  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   try {
-    const { recordset: CERT_NO } = await pool.request().query('SELECT CERTNO from GSVC_B1_H');
-
-    if (!CERT_NO.length) {
-      await pool.request().query`insert GSVC_B1_H(CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${CERTNO}, ${CERTDT},${VESSELNM}, ${ID}, ${ID})`;
-
-      Object.values(D1).forEach(async (v, i) => {
-        await pool.request()
-          .query`insert into GSVC_B1_D1(CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) values (${CERTNO}, ${
-          i + 1
-        }, ${v.GasType}, ${v.SerialNo}, ${v.TestDt.toFormat('MMM.YY')}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${v.Temp}, ${
-          v.Perform
-        }, ${ID}, ${ID})`;
-      });
+    if (type === 'save') {
+      await pool.request().query`
+      UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
+      WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B1')
+    `;
     } else {
-      await pool.request().query`update GSVC_B1_H set UP_ID = ${ID}, UP_DT = GetDate()`;
-
-      Object.values(D1).forEach(async (v, i) => {
-        await pool.request().query`update GSVC_B1_D1 set CERTNO = ${CERTNO}, CERTSEQ = ${i + 1}, GasType = ${v.GasType}, SerialNo = ${
-          v.SerialNo
-        }, TestDt = ${v.TestDt}, TareWT = ${v.TareWT.toFormat('MMM.YY')}, GrossWT = ${v.GrossWT}, Capacity = ${v.Capacity}, Press = ${
-          v.Press
-        }, Temp = ${v.Temp}, Perform = ${v.Perform}, UP_ID = ${ID}, UP_DT = GetDate()`;
-      });
+      await pool.request().query`
+        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B1')
+      `;
     }
+
+    await pool.request().query`
+      MERGE INTO GSVC_B1_H
+        USING (values(1))
+          AS Source (Number)
+          ON (CERTNO IS NOT NULL)
+        WHEN MATCHED THEN
+          UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
+        WHEN NOT MATCHED THEN
+          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+      `;
+
+    Object.values(D1).forEach(async (v, i) => {
+      await pool.request().query`
+              MERGE INTO GSVC_B1_D1
+                USING (values(1))
+                  AS Source (Number)
+                  ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
+                WHEN MATCHED THEN
+                  UPDATE SET CERTNO = ${CERTNO[0]['']}, GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${new Date().toFormat(
+        'MMM.YY'
+      )}, TareWT = ${v.TareWT}, GrossWT = ${v.GrossWT}, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${
+        v.Perform
+      }, UP_ID = ${ID}, UP_DT = GetDate()
+              WHEN NOT MATCHED THEN
+                INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) VALUES(${
+                  CERTNO[0]['']
+                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${new Date().toFormat('MMM.YY')}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${
+        v.Temp
+      }, ${v.Perform}, ${ID}, ${ID});
+            `;
+    });
+
     res.status(200).send();
   } catch (e) {
-    res.status(500).send(e);
+    console.log(e);
+    res.status(500).send();
   }
 };

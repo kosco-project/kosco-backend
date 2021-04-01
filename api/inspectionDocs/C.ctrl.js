@@ -40,7 +40,7 @@ exports.inspection = async (req, res) => {
       merge into GSVC_C_H
       using(values (1))
         as Source (Number)
-        on (CERTNO = ${CERTNO[0]['']})
+        on (CERTNO IS NOT NULL)
       when matched then
         update set UP_ID = ${ID}, UP_DT = GetDate()
       when not matched then

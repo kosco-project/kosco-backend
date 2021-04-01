@@ -8,6 +8,7 @@ const B3 = require('./B3.ctrl');
 const C = require('./C.ctrl');
 
 const H2H2AH4H41 = require('./H2H2-AH4H4-1.ctrl');
+const H3 = require('./H3.ctrl');
 
 const router = express.Router();
 
@@ -18,6 +19,9 @@ router.post('/C/inspection/:type', C.inspection);
 
 router.post('/H2/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H2-A/inspection/:type', H2H2AH4H41.inspection);
+
+router.post('/H3/inspection/:type', H3.inspection);
+
 router.post('/H4/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H4-1/inspection/:type', H2H2AH4H41.inspection);
 

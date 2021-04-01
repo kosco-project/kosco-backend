@@ -49,18 +49,22 @@ exports.inspection = async (req, res) => {
                 USING (values(1))
                   AS Source (Number)
                   ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-                WHEN MATCHED THEN
-                  UPDATE SET CERTNO = ${CERTNO[0]['']}, GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${new Date().toFormat(
+                WHEN MATCHED AND (GasType != ${v.GasType} OR SerialNo != ${v.SerialNo} OR TestDt != ${new Date(v.TestDt).toFormat(
         'MMM.YY'
-      )}, TareWT = ${v.TareWT}, GrossWT = ${v.GrossWT}, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${
+      )} OR TareWT != ${v.TareWT} OR GrossWT != ${v.GrossWT} OR Capacity != ${v.Capacity} OR Press != ${v.Press} OR Temp != ${v.Temp} OR Perform != ${
+        v.Perform
+      }) THEN
+                  UPDATE SET GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${new Date(v.TestDt).toFormat('MMM.YY')}, TareWT = ${
+        v.TareWT
+      }, GrossWT = ${v.GrossWT}, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${
         v.Perform
       }, UP_ID = ${ID}, UP_DT = GetDate()
               WHEN NOT MATCHED THEN
                 INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) VALUES(${
                   CERTNO[0]['']
-                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${new Date().toFormat('MMM.YY')}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${
-        v.Temp
-      }, ${v.Perform}, ${ID}, ${ID});
+                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${new Date(v.TestDt).toFormat('MMM.YY')}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${
+        v.Press
+      }, ${v.Temp}, ${v.Perform}, ${ID}, ${ID});
             `;
     });
 

@@ -7,12 +7,15 @@ const B3 = require('./B3.ctrl');
 
 const C = require('./C.ctrl');
 
+const H3 = require('./H3.ctrl');
+
 const router = express.Router();
 
 router.post('/A3/inspection/:type', A3.inspection);
 router.post('/B1/inspection/:type', B1.inspection);
 router.post('/B3/inspection/:type', B3.inspection);
 router.post('/C/inspection/:type', C.inspection);
+router.post('/H3/inspection/:type', H3.inspection);
 
 router.post('/:category/inspection/:type', A1A2.inspection);
 

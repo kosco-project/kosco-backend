@@ -45,11 +45,11 @@ const updateQuery = async (D1, D2, url, CERTNO, CERTDT, VESSELNM, ID) => {
         MERGE INTO [GSVC_${url}_D2]
           USING(values (1))
             AS Source (Number)
-            ON (CERTNO = @CERTSEQ and CERTSEQ = 1)
+            ON (CERTNO = @CERTNO and CERTSEQ = 1)
           WHEN MATCHED AND (Value != @D2) THEN
             UPDATE SET Value = @D2, UP_ID = @ID, UP_DT = GetDate()
           WHEN NOT MATCHED THEN
-            INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(@CERTSEQ, 1, @D2, @ID, @ID);
+            INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(@CERTNO, 1, @D2, @ID, @ID);
     `);
   });
 };

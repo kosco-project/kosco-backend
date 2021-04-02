@@ -10,6 +10,7 @@ exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;
   const { H, D1, D2, D3 } = req.body;
+  const { type } = req.params;
   const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
 
@@ -19,7 +20,6 @@ exports.inspection = async (req, res) => {
   const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
   const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
-  const { type } = req.params;
   try {
     if (type === 'save') {
       await pool.request().query`
@@ -56,6 +56,7 @@ exports.inspection = async (req, res) => {
         .request()
         .input('path', sql.NChar, path)
         .input('CERTNO', sql.NChar, CERTNO[0][''])
+        .input('CERTSEQ', sql.NChar, i + 1)
         .input('ins1', sql.NChar, v.ins1)
         .input('ins2', sql.NChar, v.ins2)
         .input('ins3', sql.NChar, v.ins3)
@@ -66,7 +67,7 @@ exports.inspection = async (req, res) => {
         .input('ins8', sql.NChar, v.ins8).query(`
         MERGE INTO [GSVC_${path}_D1]
           USING (values (1)) AS Source (Number)
-          ON (CERTNO = @CERTNO)
+          ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
           WHEN MATCHED AND (ins1 != @ins1 OR ins2 != @ins2 OR ins3 != @ins3 OR ins4 != @ins4 OR ins5 != @ins5 OR ins6 != @ins6 OR ins7 != @ins7 OR ins8 != @ins8) THEN
           UPDATE SET ins1 = @ins1, ins2 = @ins2, ins3 = @ins3, ins4 = @ins4, ins5 = @ins5, ins6 = @ins6, ins7 = @ins7, ins8 = @ins8, UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN

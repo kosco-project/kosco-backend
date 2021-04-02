@@ -14,6 +14,8 @@ const I1 = require('./I1.ctrl');
 
 const OX2 = require('./OX2.ctrl');
 
+const P1 = require('./P1.ctrl');
+
 const router = express.Router();
 
 router.post('/A3/inspection/:type', A3.inspection);
@@ -33,6 +35,8 @@ router.post('/H4-1/inspection/:type', H2H2AH4H41.inspection);
 router.post('/I-1/inspection/:type', I1.inspection);
 
 router.post('/OX2/inspection/:type', OX2.inspection);
+
+router.post('/P1/inspection/:type', P1.inspection);
 
 router.post('/:category/inspection/:type', A1A2.inspection);
 

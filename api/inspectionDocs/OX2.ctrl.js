@@ -21,19 +21,17 @@ exports.inspection = async (req, res) => {
 
   try {
     if (type === 'save') {
-      console.log(1);
       await pool.request().query`
         UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RcvNo} AND Doc_No = 'OX2')
     `;
     } else {
-      console.log(1);
       await pool.request().query`
         UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RcvNo} AND Doc_No = 'OX2')
       `;
     }
-    console.log(2);
+
     await pool.request().query`
       MERGE INTO GSVC_OX2_H
         USING (values (1)) AS Source (Number)
@@ -51,7 +49,7 @@ exports.inspection = async (req, res) => {
       WHEN NOT MATCHED THEN
         INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${D3}, ${ID}, ${ID});
     `;
-    console.log(3);
+
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
         MERGE INTO GSVC_OX2_D1
@@ -69,7 +67,7 @@ exports.inspection = async (req, res) => {
       }, ${v.SetNo2}, ${v.SetNo3}, ${v.SetNo4}, ${v.SetNo5}, ${v.SetNo6}, ${v.SetNo7}, ${v.SetNo8}, ${ID}, ${ID});
       `;
     });
-    console.log(4);
+
     Object.values(D2).forEach(async (v, i) => {
       await pool.request().query`
         MERGE INTO GSVC_OX2_D2

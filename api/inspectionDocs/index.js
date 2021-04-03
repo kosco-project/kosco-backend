@@ -7,6 +7,8 @@ const B3 = require('./B3.ctrl');
 
 const C = require('./C.ctrl');
 
+const G = require('./G.ctrl');
+
 const H3H3_1 = require('./H3H3-1.ctrl');
 const H2H2AH4H41 = require('./H2H2-AH4H4-1.ctrl');
 
@@ -22,6 +24,7 @@ router.post('/A3/inspection/:type', A3.inspection);
 router.post('/B1/inspection/:type', B1.inspection);
 router.post('/B3/inspection/:type', B3.inspection);
 router.post('/C/inspection/:type', C.inspection);
+router.post('/G/inspection/:type', G.inspection);
 
 router.post('/H2/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H2-A/inspection/:type', H2H2AH4H41.inspection);

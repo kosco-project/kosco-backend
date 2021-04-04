@@ -23,6 +23,7 @@ exports.inspection = async (req, res) => {
   const { type } = req.params;
 
   try {
+    jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
@@ -83,6 +84,12 @@ exports.inspection = async (req, res) => {
     res.status(200).send();
   } catch (e) {
     console.error(e);
-    res.status(500).send();
+    if (e.name === 'TokenExpiredError') {
+      return res.status(419).json({ code: 419, message: '토큰이 만료되었습니다.' });
+    } else if (e.name === 'JsonWebTokenError') {
+      return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
+    } else {
+      res.status(500).send();
+    }
   }
 };

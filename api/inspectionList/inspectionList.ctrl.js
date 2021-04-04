@@ -13,6 +13,7 @@ exports.find = async (req, res) => {
   endDate = endDate.split('-').join('');
 
   try {
+    jwt.verify(token, process.env.JWT_SECRET);
     const pool = await sql.connect(config);
     const { recordset } =
       process === '1'
@@ -80,7 +81,13 @@ exports.find = async (req, res) => {
     res.send({ message: 'find success', list: recordset });
   } catch (e) {
     console.error(e);
-    res.status(500).send();
+    if (e.name === 'TokenExpiredError') {
+      return res.status(419).json({ code: 419, message: '토큰이 만료되었습니다.' });
+    } else if (e.name === 'JsonWebTokenError') {
+      return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
+    } else {
+      res.status(500).send();
+    }
   }
 };
 

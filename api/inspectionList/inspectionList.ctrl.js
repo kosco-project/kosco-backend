@@ -6,7 +6,8 @@ require('dotenv').config();
 
 // 검사 리스트 찾기
 exports.find = async (req, res) => {
-  const { process } = req.params;
+  const token = req.headers.authorization.slice(7);
+  const { process: processValue } = req.params;
   let { startDate, endDate } = req.params;
 
   startDate = startDate.split('-').join('');
@@ -16,7 +17,7 @@ exports.find = async (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET);
     const pool = await sql.connect(config);
     const { recordset } =
-      process === '1'
+      processValue === '1'
         ? await pool.request().query`
       SELECT dbo.GD_F_CUSTNM(H.CUSTCD) AS CUSTNM
       ,H.RCVDT
@@ -36,7 +37,7 @@ exports.find = async (req, res) => {
       AND ISNULL(R.RESULT_GB,'') LIKE '%'
       ORDER BY CUSTNM, RCVDT
       `
-        : process === '2'
+        : processValue === '2'
         ? await pool.request().query`
       SELECT dbo.GD_F_CUSTNM(H.CUSTCD) AS CUSTNM
         ,H.RCVDT

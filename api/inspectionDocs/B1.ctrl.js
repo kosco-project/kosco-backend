@@ -20,6 +20,7 @@ exports.inspection = async (req, res) => {
   const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   try {
+    jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
       await pool.request().query`
       UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
@@ -70,7 +71,13 @@ exports.inspection = async (req, res) => {
 
     res.status(200).send();
   } catch (e) {
-    console.log(e);
-    res.status(500).send();
+    console.error(e);
+    if (e.name === 'TokenExpiredError') {
+      return res.status(419).json({ code: 419, message: '토큰이 만료되었습니다.' });
+    } else if (e.name === 'JsonWebTokenError') {
+      return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
+    } else {
+      res.status(500).send();
+    }
   }
 };

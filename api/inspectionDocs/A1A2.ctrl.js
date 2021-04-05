@@ -51,6 +51,7 @@ exports.inspection = async (req, res) => {
 
   if (category === 'A1' || category === 'A2') {
     try {
+      jwt.verify(token, process.env.JWT_SECRET);
       if (type === 'save') {
         // GRCV_CT 테이블에서 CERT_NO 삽입
         await pool.request().query`
@@ -72,8 +73,14 @@ exports.inspection = async (req, res) => {
 
       res.status(200).send();
     } catch (e) {
-      console.log(e);
-      res.status(500).send();
+      console.error(e);
+      if (e.name === 'TokenExpiredError') {
+        return res.status(419).json({ code: 419, message: '토큰이 만료되었습니다.' });
+      } else if (e.name === 'JsonWebTokenError') {
+        return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
+      } else {
+        res.status(500).send();
+      }
     }
   }
 };

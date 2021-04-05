@@ -8,7 +8,7 @@ require('date-utils');
 exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;
-  const { H, D1, D2 } = req.body;
+  const { H, D2, D3 } = req.body;
   const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
 
@@ -18,6 +18,8 @@ exports.inspection = async (req, res) => {
   const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
   const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
+  const url = req.url.split('/')[1];
+
   const { type } = req.params;
 
   try {
@@ -26,19 +28,19 @@ exports.inspection = async (req, res) => {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
         UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'C')
+        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'G')
       `;
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
         UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'C')
+        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'G')
       `;
     }
 
     // GSVC 테이블에 데이터 삽입
     await pool.request().query`
-      merge into GSVC_C_H
+      merge into GSVC_G_H
       using(values (1))
         as Source (Number)
         on (CERTNO IS NOT NULL)
@@ -48,36 +50,36 @@ exports.inspection = async (req, res) => {
         insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `;
 
-    Object.values(D1).forEach(async (v, i) => {
+    Object.values(D2).forEach(async (v, i) => {
+      const TestDt = new Date(v.TestDt.substring(0, 10)).toFormat('MMM.YY');
       await pool.request().query`
-        merge into GSVC_C_D1
-        using(values (1))
-          as Source (Number)
-          on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-        when matched and (Value != ${v}) then
-          update set Value = ${v}, UP_ID = ${ID}, UP_DT = GetDate()
-        when not matched then
-          insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v}, ${ID}, ${ID});
+        MERGE INTO GSVC_G_D2
+        USING(values (1))
+          AS Source (Number)
+          ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
+        WHEN MATCHED AND (Qty != ${v.Qty} OR SerialNo != ${v.SerialNo} OR Manuf != ${v.Manuf} OR Type != ${v.Type} OR Capacity != ${
+        v.Capacity
+      } OR TestDt != ${TestDt} OR Perform != ${v.Perform}) THEN
+          UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Qty = ${v.Qty}, SerialNo = ${v.SerialNo}, Manuf = ${v.Manuf}, Type = ${v.Type}, Capacity = ${
+        v.Capacity
+      }, TestDt = ${TestDt}, Perform = ${v.Perform}
+        WHEN NOT MATCHED THEN
+          INSERT (CERTNO, CERTSEQ, Qty, SerialNo, Manuf, Type, Capacity, TestDt, Perform, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${i + 1}, ${
+        v.Qty
+      }, ${v.SerialNo}, ${v.Manuf}, ${v.Type}, ${v.Capacity}, ${TestDt}, ${v.Perform}, ${ID}, ${ID});
       `;
     });
 
-    Object.values(D2).forEach(async (v, i) => {
-      await pool.request().query`merge into GSVC_C_D2
-        using(values (1))
-          as Source (Number)
-          on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-        when matched and (CarriedOut != ${v.carriedOut.toString()} or NotCarried != ${v.notCarried.toString()} or NotApp != ${v.notApplicable.toString()} or Comm != ${
-        v.Comm
-      }) then
-          update set CarriedOut = ${v.carriedOut}, NotCarried = ${v.notCarried}, NotApp = ${v.notApplicable}, Comm = ${
-        v.Comm
-      }, UP_ID = ${ID}, UP_DT = GetDate()
-        when not matched then
-          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.carriedOut}, ${
-        v.notCarried
-      }, ${v.notApplicable}, ${v.Comm}, ${ID}, ${ID});
-      `;
-    });
+    await pool.request().query`
+      MERGE INTO GSVC_G_D3
+      USING(values (1))
+        AS Source (Number)
+        ON (CERTNO = ${CERTNO[0]['']} and CERTSEQ = 1)
+      WHEN MATCHED AND (Value != ${D3}) THEN
+        UPDATE SET Value = ${D3}, UP_ID = ${ID}, UP_DT = GetDate()
+      WHEN NOT MATCHED THEN
+        INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 1, ${D3}, ${ID}, ${ID});
+    `;
 
     res.status(200).send();
   } catch (e) {

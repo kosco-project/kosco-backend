@@ -47,7 +47,7 @@ exports.inspection = async (req, res) => {
         USING (values (1)) AS Source (Number)
           ON (CERTNO = @CERTNO)
         WHEN MATCHED THEN
-          UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
+          UPDATE SET Value = @value, UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
           INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(@CERTNO, 1, @value, ${ID}, ${ID});
     `);

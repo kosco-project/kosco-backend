@@ -68,11 +68,11 @@ exports.inspection = async (req, res) => {
         .input('ins8', sql.NChar, v.ins8).query(`
         MERGE INTO [GSVC_${path}_D1]
           USING (values (1)) AS Source (Number)
-          ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
+            ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
           WHEN MATCHED AND (ins1 != @ins1 OR ins2 != @ins2 OR ins3 != @ins3 OR ins4 != @ins4 OR ins5 != @ins5 OR ins6 != @ins6 OR ins7 != @ins7 OR ins8 != @ins8) THEN
-          UPDATE SET ins1 = @ins1, ins2 = @ins2, ins3 = @ins3, ins4 = @ins4, ins5 = @ins5, ins6 = @ins6, ins7 = @ins7, ins8 = @ins8, UP_ID = ${ID}, UP_DT = getDate()
-        WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTSEQ, ins1, ins2, ins3, ins4, ins5, ins6, ins7, ins8, IN_ID, UP_ID) VALUES(@CERTNO, 1, @ins1, @ins2, @ins3, @ins4, @ins5, @ins6, @ins7, @ins8, ${ID}, ${ID});
+            UPDATE SET ins1 = @ins1, ins2 = @ins2, ins3 = @ins3, ins4 = @ins4, ins5 = @ins5, ins6 = @ins6, ins7 = @ins7, ins8 = @ins8, UP_ID = ${ID}, UP_DT = getDate()
+          WHEN NOT MATCHED THEN
+            INSERT (CERTNO, CERTSEQ, ins1, ins2, ins3, ins4, ins5, ins6, ins7, ins8, IN_ID, UP_ID) VALUES(@CERTNO, 1, @ins1, @ins2, @ins3, @ins4, @ins5, @ins6, @ins7, @ins8, ${ID}, ${ID});
       `);
     });
 
@@ -101,10 +101,10 @@ exports.inspection = async (req, res) => {
     console.error(e);
     if (e.name === 'TokenExpiredError') {
       return res.status(419).json({ code: 419, message: '토큰이 만료되었습니다.' });
-    } else if (e.name === 'JsonWebTokenError') {
-      return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
-    } else {
-      res.status(500).send();
     }
+    if (e.name === 'JsonWebTokenError') {
+      return res.status(401).json({ code: 401, message: '유효하지 않은 토큰입니다.' });
+    }
+    res.status(500).send();
   }
 };

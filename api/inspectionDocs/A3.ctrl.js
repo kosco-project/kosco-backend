@@ -54,11 +54,11 @@ exports.inspection = async (req, res) => {
         USING(values (1))
           AS Source (Number)
           ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-        WHEN MATCHED AND (Unit != ${v.unit} OR Remark != ${v.remarks} OR Value != ${v.value}) THEN
-          UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Value = ${v.value}, Unit = ${v.unit}, Remark = ${v.remarks}
+        WHEN MATCHED AND (Unit != ${v.Unit} OR Remark != ${v.Remarks} OR Value != ${v.Value}) THEN
+          UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Value = ${v.Value}, Unit = ${v.Unit}, Remark = ${v.Remark}
         WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.value}, ${v.unit}, ${
-        v.remarks
+          INSERT (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.Value}, ${v.Unit}, ${
+        v.Remark
       }, ${ID}, ${ID});
       `;
     });
@@ -69,11 +69,11 @@ exports.inspection = async (req, res) => {
       USING(values (1)) 
         AS Source (Number)
         ON (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-      WHEN MATCHED AND (CarriedOut != ${v.carriedOut.toString()} OR NotCarried != ${v.notCarried.toString()} OR Remark != ${v.remarks}) THEN 
-        UPDATE SET CarriedOut = ${v.carriedOut}, NotCarried = ${v.notCarried}, Remark = ${v.remarks}, UP_ID = ${ID}, UP_DT = GetDate() 
+      WHEN MATCHED AND (CarriedOut != ${v.CarriedOut.toString()} OR NotCarried != ${v.NotCarried.toString()} OR Remark != ${v.Remark}) THEN 
+        UPDATE SET CarriedOut = ${v.CarriedOut}, NotCarried = ${v.NotCarried}, Remark = ${v.Remark}, UP_ID = ${ID}, UP_DT = GetDate() 
       WHEN NOT MATCHED THEN
-        INSERT (CERTNO, CERTSEQ, CarriedOut, NotCarried, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.carriedOut}, ${v.notCarried}, ${
-        v.remarks
+        INSERT (CERTNO, CERTSEQ, CarriedOut, NotCarried, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${v.NotCarried}, ${
+        v.Remark
       }, ${ID}, ${ID});
   `;
     });

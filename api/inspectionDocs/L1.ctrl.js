@@ -17,7 +17,11 @@ exports.inspection = async (req, res) => {
 
   const { type } = req.params;
 
-  const ExpiryDate = D2[2];
+  const ExpiryDate = Object.values(D2[2])
+    .slice(1, 5)
+    .map(date => new Date(date.substring(0, 10)).toFormat('MMM.YY'));
+
+  console.log(ExpiryDate);
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
@@ -71,20 +75,10 @@ exports.inspection = async (req, res) => {
             USING(values (1))
               AS Source (Number)
               ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 3)
-            WHEN MATCHED AND (Value1 != ${new Date(ExpiryDate.Value1).toFormat('MMM.YY')} OR Value2 != ${new Date(ExpiryDate.Value2).toFormat(
-      'MMM.YY'
-    )} OR Value3 != ${new Date(ExpiryDate.Value3).toFormat('MMM.YY')} OR Value4 != ${new Date(ExpiryDate.Value4).toFormat('MMM.YY')}) THEN
-              UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), DESCT = ${ExpiryDate.DESCT}, Value1 = ${new Date(ExpiryDate.Value1).toFormat(
-      'MMM.YY'
-    )}, Value2 = ${new Date(ExpiryDate.Value2).toFormat('MMM.YY')}, Value3 = ${new Date(ExpiryDate.Value3).toFormat('MMM.YY')}, Value4 = ${new Date(
-      ExpiryDate.Value4
-    ).toFormat('MMM.YY')}
+            WHEN MATCHED AND (Value1 != ${ExpiryDate[0]} OR Value2 != ${ExpiryDate[1]} OR Value3 != ${ExpiryDate[2]} OR Value4 != ${ExpiryDate[3]}) THEN
+              UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), DESCT = ${ExpiryDate.DESCT}, Value1 = ${ExpiryDate[0]}, Value2 = ${ExpiryDate[1]}, Value3 = ${ExpiryDate[2]}, Value4 = ${ExpiryDate[3]}
             WHEN NOT MATCHED THEN
-              INSERT (CERTNO, CERTSEQ, DESCT, Value1, Value2, Value3, Value4, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 3, ${
-      ExpiryDate.DESCT
-    }, ${new Date(ExpiryDate.Value1).toFormat('MMM.YY')}, ${new Date(ExpiryDate.Value2).toFormat('MMM.YY')}, ${new Date(ExpiryDate.Value3).toFormat(
-      'MMM.YY'
-    )}, ${new Date(ExpiryDate.Value4).toFormat('MMM.YY')}, ${ID}, ${ID});
+              INSERT (CERTNO, CERTSEQ, DESCT, Value1, Value2, Value3, Value4, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 3, ${ExpiryDate.DESCT}, ${ExpiryDate[0]}, ${ExpiryDate[1]}, ${ExpiryDate[2]}, ${ExpiryDate[3]}, ${ID}, ${ID});
         `;
 
     res.status(200).send();

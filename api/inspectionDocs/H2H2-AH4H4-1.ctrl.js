@@ -10,6 +10,7 @@ const updateQuery = async (D1, D2, url, CERTNO, CERTDT, VESSELNM, ID) => {
 
   Object.values(D1).forEach(async (v, i) => {
     const TestDt = new Date(v.TestDt.substring(0, 10)).toFormat('MMM.YY');
+
     await pool
       .request()
       .input('url', sql.NChar, url)
@@ -20,7 +21,7 @@ const updateQuery = async (D1, D2, url, CERTNO, CERTDT, VESSELNM, ID) => {
       .input('Volume', sql.NChar, v.Volume)
       .input('WorkPress', sql.NChar, v.WorkPress)
       .input('SerialNo', sql.NChar, v.SerialNo)
-      .input('TestDt', sql.Date, TestDt)
+      .input('TestDt', sql.NChar, TestDt)
       .input('Perform', sql.NChar, v.Perform)
       .input('D2', sql.NChar, D2)
       .input('ID', sql.NChar, ID).query(`

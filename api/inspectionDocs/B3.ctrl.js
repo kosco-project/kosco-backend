@@ -54,11 +54,11 @@ exports.inspection = async (req, res) => {
         using(values (1))
           as Source (Number)
           on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-        when matched and (Unit != ${v.unit} or Remark != ${v.remarks} or Value != ${v.value}) then
-          update set UP_ID = ${ID}, UP_DT = GetDate(), Value = ${v.value}, Unit = ${v.unit}, Remark = ${v.remarks}
+        when matched and (Unit != ${v.Unit} or Remark != ${v.Remark} or Value != ${v.Value}) then
+          update set UP_ID = ${ID}, UP_DT = GetDate(), Value = ${v.Value}, Unit = ${v.Unit}, Remark = ${v.Remark}
         when not matched then
-          insert (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.value}, ${v.unit}, ${
-        v.remarks
+          insert (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.Value}, ${v.Unit}, ${
+        v.Remark
       }, ${ID}, ${ID});
       `;
     });
@@ -68,16 +68,16 @@ exports.inspection = async (req, res) => {
         using(values (1))
           as Source (Number)
           on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
-        when matched and (CarriedOut != ${v.carriedOut.toString()} or NotCarried != ${v.notCarried.toString()} or NotApp != ${v.notApplicable.toString()} or Comm != ${
+        when matched and (CarriedOut != ${v.CarriedOut.toString()} or NotCarried != ${v.NotCarried.toString()} or NotApp != ${v.NotApp.toString()} or Comm != ${
         v.Comm
       }) then
-          update set CarriedOut = ${v.carriedOut}, NotCarried = ${v.notCarried}, NotApp = ${v.notApplicable}, Comm = ${
+          update set CarriedOut = ${v.CarriedOut}, NotCarried = ${v.NotCarried}, NotApp = ${v.NotApp}, Comm = ${
         v.Comm
       }, UP_ID = ${ID}, UP_DT = GetDate()
         when not matched then
-          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.carriedOut}, ${
-        v.notCarried
-      }, ${v.notApplicable}, ${v.Comm}, ${ID}, ${ID});
+          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${
+        v.NotCarried
+      }, ${v.NotApp}, ${v.Comm}, ${ID}, ${ID});
       `;
     });
 

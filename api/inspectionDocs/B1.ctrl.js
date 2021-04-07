@@ -12,7 +12,6 @@ exports.inspection = async (req, res) => {
   const { type } = req.params;
   const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
-  console.log(new Date());
 
   const pool = await sql.connect(config);
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
@@ -45,27 +44,24 @@ exports.inspection = async (req, res) => {
       `;
 
     Object.values(D1).forEach(async (v, i) => {
+      const TestDt = new Date(v.TestDt.substring(0, 10)).toFormat('MMM.YY');
       await pool.request().query`
               MERGE INTO GSVC_B1_D1
                 USING (values(1))
                   AS Source (Number)
                   ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-                WHEN MATCHED AND (GasType != ${v.GasType} OR SerialNo != ${v.SerialNo} OR TestDt != ${new Date(v.TestDt).toFormat(
-        'MMM.YY'
-      )} OR TareWT != ${v.TareWT} OR GrossWT != ${v.GrossWT} OR Capacity != ${v.Capacity} OR Press != ${v.Press} OR Temp != ${v.Temp} OR Perform != ${
-        v.Perform
-      }) THEN
-                  UPDATE SET GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${new Date(v.TestDt).toFormat('MMM.YY')}, TareWT = ${
+                WHEN MATCHED AND (GasType != ${v.GasType} OR SerialNo != ${v.SerialNo} OR TestDt != ${TestDt} OR TareWT != ${
         v.TareWT
-      }, GrossWT = ${v.GrossWT}, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${
-        v.Perform
-      }, UP_ID = ${ID}, UP_DT = GetDate()
+      } OR GrossWT != ${v.GrossWT} OR Capacity != ${v.Capacity} OR Press != ${v.Press} OR Temp != ${v.Temp} OR Perform != ${v.Perform}) THEN
+                  UPDATE SET GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${TestDt}, TareWT = ${v.TareWT}, GrossWT = ${
+        v.GrossWT
+      }, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${v.Perform}, UP_ID = ${ID}, UP_DT = GetDate()
               WHEN NOT MATCHED THEN
                 INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) VALUES(${
                   CERTNO[0]['']
-                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${new Date(v.TestDt).toFormat('MMM.YY')}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${
-        v.Press
-      }, ${v.Temp}, ${v.Perform}, ${ID}, ${ID});
+                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${TestDt}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${v.Temp}, ${
+        v.Perform
+      }, ${ID}, ${ID});
             `;
     });
 

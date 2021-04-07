@@ -70,20 +70,21 @@ exports.inspection = async (req, res) => {
     });
 
     Object.values(D2).forEach(async (v, i) => {
+      const TestDt = new Date(v.TestDt.substring(0, 10)).toFormat('MMM.YY');
       await pool.request().query`
         MERGE INTO GSVC_OX2_D2
           USING (values(1)) AS Source (Number)
           ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
         WHEN MATCHED AND (Manuf != ${v.Manuf} OR Volume != ${v.Volume} OR WorkPress != ${v.WorkPress} OR SerialNo != ${
         v.SerialNo
-      } OR TestDt != ${new Date(v.TestDt).toFormat('MMM.YY')} OR Perform != ${v.Perform}) THEN
-          UPDATE SET Manuf = ${v.Manuf}, Volume = ${v.Volume}, WorkPress = ${v.WorkPress}, SerialNo = ${v.SerialNo}, TestDt = ${new Date(
-        v.TestDt
-      ).toFormat('MMM.YY')}, Perform = ${v.Perform}, IN_ID = ${ID}, UP_ID = ${ID}
+      } OR TestDt != ${TestDt} OR Perform != ${v.Perform}) THEN
+          UPDATE SET Manuf = ${v.Manuf}, Volume = ${v.Volume}, WorkPress = ${v.WorkPress}, SerialNo = ${v.SerialNo}, TestDt = ${TestDt}, Perform = ${
+        v.Perform
+      }, IN_ID = ${ID}, UP_ID = ${ID}
         WHEN NOT MATCHED THEN
           INSERT (CERTNO, CERTSEQ, Manuf, Volume, WorkPress, SerialNo, TestDt, Perform, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${
         v.Manuf
-      }, ${v.Volume}, ${v.WorkPress}, ${v.SerialNo}, ${new Date(v.TestDt).toFormat('MMM.YY')}, ${v.Perform}, ${ID}, ${ID});
+      }, ${v.Volume}, ${v.WorkPress}, ${v.SerialNo}, ${TestDt}, ${v.Perform}, ${ID}, ${ID});
       `;
     });
 

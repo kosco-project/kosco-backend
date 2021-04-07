@@ -34,14 +34,19 @@ exports.inspection = async (req, res) => {
       `;
     }
 
-    await pool.request().input('path', sql.NChar, path).input('CERTNO', sql.NChar, CERTNO[0]['']).input('value', sql.NChar, D3).query(`
+    await pool
+      .request()
+      .input('path', sql.NChar, path)
+      .input('CERTNO', sql.NChar, CERTNO[0][''])
+      .input('value', sql.NChar, D3)
+      .input('VESSELNM', sql.NChar, VESSELNM).query(`
       MERGE INTO [GSVC_${path}_H]
         USING (values (1)) AS Source (Number)
           ON (CERTNO IS NOT NULL)
         WHEN MATCHED THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(@CERTNO, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(@CERTNO, ${CERTDT}, @VESSELNM, ${ID}, ${ID});
 
       MERGE INTO [GSVC_${path}_D3]
         USING (values (1)) AS Source (Number)

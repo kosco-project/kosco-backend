@@ -44,16 +44,17 @@ exports.inspection = async (req, res) => {
     `;
 
     Object.values(D1).forEach(async (v, i) => {
+      const ManufDt = new Date(v.ManufDt.substring(0, 10)).toFormat('MMM.YY');
       await pool.request().query`
         MERGE INTO GSVC_I_D1
           USING (values (1)) AS Source (Number)
             ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-          WHEN MATCHED AND (SerNo != ${v.SerNo} OR ManufType != ${v.ManufType} OR ManufDt = ${v.ManufDt}) THEN
-            UPDATE SET SerNo = ${v.SerNo}, ManufType = ${v.ManufType}, ManufDt = ${v.ManufDt}, UP_ID = ${ID}, UP_DT = getDate()
+          WHEN MATCHED AND (SerNo != ${v.SerNo} OR ManufType != ${v.ManufType} OR ManufDt = ${ManufDt}) THEN
+            UPDATE SET SerNo = ${v.SerNo}, ManufType = ${v.ManufType}, ManufDt = ${ManufDt}, UP_ID = ${ID}, UP_DT = getDate()
           WHEN NOT MATCHED THEN
-            INSERT (CERTNO, CERTSEQ, SerNo, ManufType, ManufDt, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${v.SerNo}, ${v.ManufType}, ${
-        v.ManufDt
-      }, ${ID}, ${ID});
+            INSERT (CERTNO, CERTSEQ, SerNo, ManufType, ManufDt, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${v.SerNo}, ${
+        v.ManufType
+      }, ${ManufDt}, ${ID}, ${ID});
       `;
     });
 

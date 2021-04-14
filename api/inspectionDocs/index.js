@@ -8,6 +8,7 @@ const B3 = require('./B3.ctrl');
 const C = require('./C.ctrl');
 
 const F = require('./F.ctrl');
+const F2 = require('./F2.ctrl');
 
 const G = require('./G.ctrl');
 
@@ -30,10 +31,15 @@ const WW1 = require('./WW1.ctrl');
 const router = express.Router();
 
 router.post('/A3/inspection/:type', A3.inspection);
+
 router.post('/B1/inspection/:type', B1.inspection);
 router.post('/B3/inspection/:type', B3.inspection);
+
 router.post('/C/inspection/:type', C.inspection);
+
 router.post('/F/inspection/:type', F.inspection);
+router.post('/F2/inspection/:type', F2.inspection);
+
 router.post('/G/inspection/:type', G.inspection);
 
 router.post('/H1/inspection/:type', H1H3H3_1.inspection);

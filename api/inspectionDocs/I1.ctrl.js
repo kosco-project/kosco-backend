@@ -46,6 +46,15 @@ exports.inspection = async (req, res) => {
           UPDATE SET UP_ID = ${ID}, UP_DT = GetDate()
         WHEN NOT MATCHED THEN
           INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+
+      MERGE INTO [GSVC_I-1_D2]
+        USING(values (1))
+          AS Source (Number)
+          ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 1)
+        WHEN MATCHED AND (Value != ${D2}) THEN
+          UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Value = ${D2}
+        WHEN NOT MATCHED THEN
+          INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 1, ${D2}, ${ID}, ${ID});
     `;
 
     Object.values(D1).forEach(async (v, i) => {
@@ -67,17 +76,6 @@ exports.inspection = async (req, res) => {
       }, ${v.Type}, ${MFGDt}, ${v.SerialNo}, ${v.Pressure}, ${v.Perform},  ${ID}, ${ID});
       `;
     });
-
-    await pool.request().query`
-      MERGE INTO [GSVC_I-1_D2]
-        USING(values (1))
-          AS Source (Number)
-          ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 1)
-        WHEN MATCHED AND (Value != ${D2}) THEN
-          UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Value = ${D2}
-        WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 1, ${D2}, ${ID}, ${ID});
-    `;
 
     res.status(200).send();
   } catch (e) {

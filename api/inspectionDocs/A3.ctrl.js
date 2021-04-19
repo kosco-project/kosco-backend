@@ -1,25 +1,19 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
 const config = require('../../lib/configDB');
-
 require('dotenv').config();
 require('date-utils');
-
 exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;
   const { H, D1, D2 } = req.body;
   const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
-
   const pool = await sql.connect(config);
-
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
   const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
   const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
-
   const { type } = req.params;
-
   try {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
@@ -35,7 +29,6 @@ exports.inspection = async (req, res) => {
         WHERE (RcvNo = ${RcvNo} AND Doc_No = 'A3')
       `;
     }
-
     // GSVC 테이블에 데이터 삽입
     await pool.request().query`
       MERGE INTO GSVC_A3_H
@@ -47,7 +40,6 @@ exports.inspection = async (req, res) => {
       WHEN NOT MATCHED THEN
         INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
     `;
-
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
         MERGE INTO GSVC_A3_D1
@@ -62,9 +54,20 @@ exports.inspection = async (req, res) => {
       }, ${ID}, ${ID});
       `;
     });
-
     Object.values(D2).forEach(async (v, i) => {
-      await pool.request().query`
+      if (i === 16) {
+        await pool.request().query`
+          MERGE INTO GSVC_A3_D2
+          USING(values (1))
+            AS Source (Number)
+            ON (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
+      WHEN MATCHED AND (CarriedOut != ${v.CarriedOut.toString()}) THEN 
+        UPDATE SET CarriedOut = ${v.CarriedOut}, UP_ID = ${ID}, UP_DT = GetDate() 
+      WHEN NOT MATCHED THEN
+        INSERT (CERTNO, CERTSEQ, CarriedOut, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${ID}, ${ID});
+        `;
+      } else {
+        await pool.request().query`
       MERGE INTO GSVC_A3_D2 
       USING(values (1)) 
         AS Source (Number)
@@ -73,9 +76,10 @@ exports.inspection = async (req, res) => {
         UPDATE SET CarriedOut = ${v.CarriedOut}, NotCarried = ${v.NotCarried}, Remark = ${v.Remark}, UP_ID = ${ID}, UP_DT = GetDate() 
       WHEN NOT MATCHED THEN
         INSERT (CERTNO, CERTSEQ, CarriedOut, NotCarried, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${v.NotCarried}, ${
-        v.Remark
-      }, ${ID}, ${ID});
+          v.Remark
+        }, ${ID}, ${ID});
   `;
+      }
     });
     res.status(200).send();
   } catch (e) {

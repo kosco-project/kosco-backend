@@ -94,10 +94,10 @@ exports.inspection = async (req, res) => {
         MERGE INTO [GSVC_${path}_D2]
           USING (values (1)) AS Source (Number)
           ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
-          WHEN MATCHED AND (Manuf != @Manuf OR Type != @Type OR SerialNo != @SerialNo OR Remarks != @Remark) THEN
-            UPDATE SET Manuf = @Manuf, Type = @Type, SerialNo = @SerialNo, Remarks = @Remark, UP_ID = ${ID}, UP_DT = getDate()
+          WHEN MATCHED AND (Manuf != @Manuf OR Type != @Type OR SerialNo != @SerialNo OR Remark != @Remark) THEN
+            UPDATE SET Manuf = @Manuf, Type = @Type, SerialNo = @SerialNo, Remark = @Remark, UP_ID = ${ID}, UP_DT = getDate()
           WHEN NOT MATCHED THEN
-            INSERT (CERTNO, CERTSEQ, Manuf, Type, SerialNo, Remarks, IN_ID, UP_ID) VALUES (@CERTNO, @CERTSEQ, @Manuf, @Type, @SerialNo, @Remark, ${ID}, ${ID});
+            INSERT (CERTNO, CERTSEQ, Manuf, Type, SerialNo, Remark, IN_ID, UP_ID) VALUES (@CERTNO, @CERTSEQ, @Manuf, @Type, @SerialNo, @Remark, ${ID}, ${ID});
       `);
     });
 

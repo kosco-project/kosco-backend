@@ -5,6 +5,47 @@ const config = require('../../lib/configDB');
 require('dotenv').config();
 require('date-utils');
 
+exports.details = async (req, res) => {
+  const { ct } = req.query;
+
+  try {
+    const pool = await sql.connect(config);
+
+    const { recordset: D1 } = await pool.request().query`
+        SELECT GSVC_G3_D1.Value FROM GSVC_G3_D1
+        WHERE GSVC_G3_D1.CERTNO = ${ct}
+      `;
+
+    const { recordset: D2 } = await pool.request().query`
+        SELECT GSVC_G3_D2.Value FROM GSVC_G3_D2
+        WHERE GSVC_G3_D2.CERTNO = ${ct}
+    `;
+
+    const { recordset: D3 } = await pool.request().query`
+        SELECT GSVC_G3_D3.Value FROM GSVC_G3_D3
+        WHERE GSVC_G3_D3.CERTNO = ${ct}
+    `;
+
+    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
+
+    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
+
+    const D3arr = D3.map((item, i) => ({ [i]: +item.Value }));
+    const D3obj = D3arr.reduce((a, c) => ({ ...a, ...c }), {});
+
+    res.json({
+      D1: D1obj,
+      D2: D2obj,
+      D3: D3obj,
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).send();
+  }
+};
+
 exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;

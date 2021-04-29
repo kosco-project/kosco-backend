@@ -33,6 +33,9 @@ const router = express.Router();
 router.get('/A1', A1A2.details);
 router.get('/A2', A1A2.details);
 
+router.post('/A1/inspection/:type', A1A2.inspection);
+router.post('/A2/inspection/:type', A1A2.inspection);
+
 router.post('/A3/inspection/:type', A3.inspection);
 
 router.post('/B1/inspection/:type', B1.inspection);
@@ -68,7 +71,5 @@ router.post('/P1/inspection/:type', P1.inspection);
 
 router.post('/W/inspection/:type', WW1.inspection);
 router.post('/W1/inspection/:type', WW1.inspection);
-
-router.post('/:category/inspection/:type', A1A2.inspection);
 
 module.exports = router;

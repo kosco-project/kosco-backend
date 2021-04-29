@@ -30,6 +30,9 @@ const WW1 = require('./WW1.ctrl');
 
 const router = express.Router();
 
+router.get('/A1', A1A2.details);
+router.get('/A2', A1A2.details);
+
 router.post('/A3/inspection/:type', A3.inspection);
 
 router.post('/B1/inspection/:type', B1.inspection);

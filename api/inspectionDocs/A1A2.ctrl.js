@@ -36,6 +36,39 @@ const updateQuery = async (table, data, category, CERTNO, ID, VESSELNM, CERTDT) 
   });
 };
 
+exports.details = async (req, res) => {
+  const path = req.path.split('/')[1];
+  const { ct } = req.query;
+
+  try {
+    const pool = await sql.connect(config);
+
+    const { recordset: D1 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
+        SELECT GSVC_${path}_D1.Value FROM GSVC_${path}_D1
+        WHERE GSVC_${path}_D1.CERTNO = @ct
+      `);
+    const { recordset: D2 } = await pool.request().input('category', sql.NChar, path).input('ct', sql.NChar, ct).query(`
+        SELECT GSVC_${path}_D2.Value FROM GSVC_${path}_D2
+        WHERE GSVC_${path}_D2.CERTNO = @ct
+    `);
+
+    // 가져온 데이터를 프론트엔드 상태와 동일하게 주기 위한 작업
+    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
+
+    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
+
+    res.json({
+      D1: D1obj,
+      D2: D2obj,
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).send();
+  }
+};
+
 exports.inspection = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const ID = jwt.decode(token).userId;

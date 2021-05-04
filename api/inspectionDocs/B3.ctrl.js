@@ -12,28 +12,40 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_B3_D1.Value FROM GSVC_B3_D1
+        SELECT Value, Unit, Remark FROM GSVC_B3_D1
         WHERE GSVC_B3_D1.CERTNO = ${ct}
       `;
 
     const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_B3_D2.Value FROM GSVC_B3_D2
+        SELECT CarriedOut, NotCarried, NotApp, Comm FROM GSVC_B3_D2
         WHERE GSVC_B3_D2.CERTNO = ${ct}
     `;
 
     const { recordset: D3 } = await pool.request().query`
-        SELECT GSVC_B3_D3.Value FROM GSVC_B3_D3
+        SELECT Value1, Value2, Value3, Value4 FROM GSVC_B3_D3
         WHERE GSVC_B3_D3.CERTNO = ${ct}
     `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1arr = D1.map(({ Value, Unit, Remark }, i) => ({ [i]: { Value, Unit, Remark } }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
 
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2arr = D2.map((item, i) => ({
+      [i]: {
+        CarriedOut: +item.CarriedOut,
+        NotCarried: +item.NotCarried,
+        NotApp: +item.NotApp,
+        Comm: item.Comm,
+      },
+    }));
     const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
 
-    const D3arr = D3.map((item, i) => ({ [i]: +item.Value }));
-    const D3obj = D3arr.reduce((a, c) => ({ ...a, ...c }), {});
+    const D3arr = Object.values(D3[0]);
+    const D3obj = {
+      0: D3arr[0],
+      1: D3arr[1],
+      2: D3arr[2],
+      3: D3arr[3],
+    };
 
     res.json({
       D1: D1obj,

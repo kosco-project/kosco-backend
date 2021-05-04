@@ -12,23 +12,30 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_B1_D1.Value FROM GSVC_B1_D1
+        SELECT GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform FROM GSVC_B1_D1
         WHERE GSVC_B1_D1.CERTNO = ${ct}
       `;
-    const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_B1_D2.Value FROM GSVC_B1_D2
-        WHERE GSVC_B1_D2.CERTNO = ${ct}
-    `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1arr = D1.map((item, i) => {
+      const { GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform } = item;
+      return {
+        [i]: {
+          GasType,
+          SerialNo,
+          TestDt,
+          TareWT,
+          GrossWT,
+          Capacity,
+          Press,
+          Temp,
+          Perform,
+        },
+      };
+    });
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
-
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
-    const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
 
     res.json({
       D1: D1obj,
-      D2: D2obj,
     });
   } catch (e) {
     console.log(e);
@@ -46,20 +53,28 @@ exports.inspection = async (req, res) => {
 
   const pool = await sql.connect(config);
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
-      await pool.request().query`
-      UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-      WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B1')
+      const { recordset: magamYn } = await pool.request().query`
+      UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
+
+      SELECT MagamYn FROM GRCV_CT
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
     `;
+
+      if (magamYn[0].MagamYn) {
+        await pool.request().query`
+        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
+      `;
+      }
     } else {
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B1')
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
       `;
     }
 

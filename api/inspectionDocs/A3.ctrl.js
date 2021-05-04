@@ -11,11 +11,11 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_A3_D1.Value, GSVC_A3_D1.Unit, GSVC_A3_D1.Remark FROM GSVC_A3_D1
+        SELECT Value, Unit, Remark FROM GSVC_A3_D1
         WHERE GSVC_A3_D1.CERTNO = ${ct}
       `;
     const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_A3_D2.CarriedOut, GSVC_A3_D2.NotCarried, GSVC_A3_D2.Remark FROM GSVC_A3_D2
+        SELECT CarriedOut, NotCarried, Remark FROM GSVC_A3_D2
         WHERE GSVC_A3_D2.CERTNO = ${ct}
     `;
 

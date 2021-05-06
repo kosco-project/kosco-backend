@@ -49,7 +49,9 @@ router.get('/B3', B3.details);
 router.post('/B1/inspection/:type', B1.inspection);
 router.post('/B3/inspection/:type', B3.inspection);
 
+// C
 router.post('/C/inspection/:type', C.inspection);
+router.get('/C', C.details);
 
 router.post('/F/inspection/:type', F.inspection);
 router.post('/F2/inspection/:type', F2.inspection);

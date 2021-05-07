@@ -57,6 +57,7 @@ exports.inspection = async (req, res) => {
   try {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
+      // 마감 한 문서 => 임시 저장 => 임시 저장 문서로 변경
       const { recordset: magamYn } = await pool.request().query`
       UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
@@ -64,20 +65,26 @@ exports.inspection = async (req, res) => {
       SELECT MagamYn FROM GRCV_CT
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
     `;
-
-      if (magamYn[0].MagamYn) {
+      const { recordset: magam } = await pool.request().query`
+    SELECT MagamYn FROM GRCV_CT
+    WHERE (RcvNo = 'SN2012050002' AND Doc_No = 'B1')
+  `;
+      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
+      if (magamYn[0].MagamYn === '1') {
         await pool.request().query`
         UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
       `;
       }
     } else {
+      // 검사 완료
       await pool.request().query`
         UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
       `;
     }
 
+    // B1_H
     await pool.request().query`
       MERGE INTO GSVC_B1_H
         USING (values(1))
@@ -86,29 +93,52 @@ exports.inspection = async (req, res) => {
         WHEN MATCHED THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+          INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${H.CERTNO || CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `;
 
-    Object.values(D1).forEach(async (v, i) => {
-      const TestDt = new Date(v.TestDt.substring(0, 10)).toFormat('MMM.YY');
+    // request로 받지 않은 내용은 행 삭제를 해야 한다.
+    let insertDt = '';
+    if (H.CERTNO) {
+      const { recordset: insertInfo } = await pool.request().query`
+        SELECT IN_DT FROM GSVC_B1_D1
+        WHERE (CERTNO = ${H.CERTNO} AND CERTSEQ = 1)
+      `;
+      insertDt = insertInfo[0].IN_DT;
+
       await pool.request().query`
-              MERGE INTO GSVC_B1_D1
-                USING (values(1))
-                  AS Source (Number)
-                  ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-                WHEN MATCHED AND (GasType != ${v.GasType} OR SerialNo != ${v.SerialNo} OR TestDt != ${TestDt} OR TareWT != ${
-        v.TareWT
-      } OR GrossWT != ${v.GrossWT} OR Capacity != ${v.Capacity} OR Press != ${v.Press} OR Temp != ${v.Temp} OR Perform != ${v.Perform}) THEN
-                  UPDATE SET GasType = ${v.GasType}, SerialNo = ${v.SerialNo}, TestDt = ${TestDt}, TareWT = ${v.TareWT}, GrossWT = ${
-        v.GrossWT
-      }, Capacity = ${v.Capacity}, Press = ${v.Press}, Temp = ${v.Temp}, Perform = ${v.Perform}, UP_ID = ${ID}, UP_DT = GetDate()
-              WHEN NOT MATCHED THEN
-                INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) VALUES(${
-                  CERTNO[0]['']
-                }, ${i + 1}, ${v.GasType}, ${v.SerialNo}, ${TestDt}, ${v.TareWT}, ${v.GrossWT}, ${v.Capacity}, ${v.Press}, ${v.Temp}, ${
-        v.Perform
-      }, ${ID}, ${ID});
-            `;
+        SELECT * FROM GSVC_B1_D1 WHERE CERTNO = ${H.CERTNO}
+
+        BEGIN TRAN
+        DELETE FROM GSVC_B1_D1 WHERE CERTNO = ${H.CERTNO}
+        SELECT * FROM GSVC_B1_D1 WHERE CERTNO = ${H.CERTNO}
+        COMMIT TRAN
+      `;
+    }
+
+    Object.values(D1).forEach(async (v, i) => {
+      const { GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform } = v;
+
+      await pool.request().query`
+        INSERT GSVC_B1_D1 (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, IN_DT, UP_ID)
+        VALUES(${H.CERTNO || CERTNO[0]['']}, ${
+        i + 1
+      }, ${GasType}, ${SerialNo}, ${TestDt}, ${TareWT}, ${GrossWT}, ${Capacity}, ${Press}, ${Temp}, ${Perform}, ${ID}, ${
+        insertDt || new Date()
+      }, ${ID});
+      `;
+
+      // await pool.request().query`
+      //         MERGE INTO GSVC_B1_D1
+      //           USING (values(1))
+      //             AS Source (Number)
+      //             ON (CERTNO = ${H.CERTNO || CERTNO[0]['']} AND CERTSEQ = ${i + 1})
+      //           WHEN MATCHED AND (GasType != ${GasType} OR SerialNo != ${SerialNo} OR TestDt != ${TestDt} OR TareWT != ${TareWT} OR GrossWT != ${GrossWT} OR Capacity != ${Capacity} OR Press != ${Press} OR Temp != ${Temp} OR Perform != ${Perform}) THEN
+      //             UPDATE SET GasType = ${GasType}, SerialNo = ${SerialNo}, TestDt = ${TestDt}, TareWT = ${TareWT}, GrossWT = ${GrossWT}, Capacity = ${Capacity}, Press = ${Press}, Temp = ${Temp}, Perform = ${Perform}, UP_ID = ${ID}, UP_DT = GetDate()
+      //         WHEN NOT MATCHED THEN
+      //           INSERT (CERTNO, CERTSEQ, GasType, SerialNo, TestDt, TareWT, GrossWT, Capacity, Press, Temp, Perform, IN_ID, UP_ID) VALUES(${
+      //             H.CERTNO || CERTNO[0]['']
+      //           }, ${i + 1}, ${GasType}, ${SerialNo}, ${TestDt}, ${TareWT}, ${GrossWT}, ${Capacity}, ${Press}, ${Temp}, ${Perform}, ${ID}, ${ID});
+      //       `;
     });
 
     res.status(200).send();

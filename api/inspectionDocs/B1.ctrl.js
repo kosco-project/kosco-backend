@@ -73,7 +73,7 @@ exports.inspection = async (req, res) => {
           VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
 
           UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
-        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
+          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
         `;
       }
 
@@ -87,7 +87,7 @@ exports.inspection = async (req, res) => {
     } else {
       // 검사 완료
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
       `;
     }

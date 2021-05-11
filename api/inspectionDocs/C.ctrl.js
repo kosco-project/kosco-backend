@@ -19,7 +19,7 @@ exports.details = async (req, res) => {
         SELECT CarriedOut, NotCarried, NotApp, Comm FROM GSVC_C_D2
         WHERE CERTNO = ${ct}
     `;
-
+    console.log(D1);
     const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
 
@@ -61,14 +61,21 @@ exports.inspection = async (req, res) => {
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
       const { recordset: magamYn } = await pool.request().query`
-      UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'C')
-
       SELECT MagamYn FROM GRCV_CT
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'C')
     `;
 
-      if (magamYn[0].MagamYn) {
+      if (!magamYn[0].MagamYn) {
+        await pool.request().query`
+        INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+        VALUES (${CERTNO[0]['']}, 'C', 1, 1, ${ID}, ${ID})
+
+        UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'C')
+      `;
+      }
+
+      if (magamYn[0].MagamYn === '1') {
         await pool.request().query`
         UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'C')
@@ -77,7 +84,7 @@ exports.inspection = async (req, res) => {
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'C')
       `;
     }
@@ -87,11 +94,11 @@ exports.inspection = async (req, res) => {
       merge into GSVC_C_H
       using(values (1))
         as Source (Number)
-        on (CERTNO IS NOT NULL)
+        on (CERTNO = ${H.CERTNO})
       when matched then
         update set UP_ID = ${ID}, UP_DT = GetDate()
       when not matched then
-        insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+        insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `;
 
     Object.values(D1).forEach(async (v, i) => {

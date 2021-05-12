@@ -61,6 +61,9 @@ router.get('/F2', F2.details);
 router.post('/F/inspection/:type', F.inspection);
 router.post('/F2/inspection/:type', F2.inspection);
 
+// G
+router.get('/G', G.details);
+
 router.post('/G/inspection/:type', G.inspection);
 
 router.post('/H1/inspection/:type', H1H3H3_1.inspection);

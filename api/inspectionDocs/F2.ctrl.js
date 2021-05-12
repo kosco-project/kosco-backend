@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
+const moment = require('moment');
 const config = require('../../lib/configDB');
 
 exports.details = async (req, res) => {
@@ -9,18 +10,38 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_F1_D1.Value FROM GSVC_F1_D1
-        WHERE GSVC_F1_D1.CERTNO = ${ct}
+        SELECT manuf, type, s_no, remark FROM GSVC_F2_D1
+        WHERE CERTNO = ${ct}
       `;
     const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_F1_D2.Value FROM GSVC_F1_D2
-        WHERE GSVC_F1_D2.CERTNO = ${ct}
+        SELECT confirm, f_pressure, f_depth, expiry_date, value1, value2, recommend FROM GSVC_F2_D2
+        WHERE CERTNO = ${ct}
     `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1arr = D1.map(({ manuf, type, s_no, remark }, i) => ({
+      [i]: {
+        manuf,
+        type,
+        s_no,
+        remark,
+      },
+    }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
 
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2arr = D2.map((item, i) => {
+      const { confirm, f_pressure, f_depth, expiry_date, value1, value2, recommend } = item;
+      return {
+        [i]: {
+          confirm,
+          f_pressure,
+          f_depth,
+          expiry_date,
+          value1,
+          value2,
+          recommend,
+        },
+      };
+    });
     const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
 
     res.json({
@@ -44,29 +65,46 @@ exports.inspection = async (req, res) => {
   const pool = await sql.connect(config);
 
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
-  const expiry_date = new Date(D2.expiry_date.substring(0, 10)).toFormat('MMM.YY');
+  const { confirm, f_pressure, f_depth, value1, value2, recommend } = D2;
+  const expiry_date = new Date(D2.expiry_date).toFormat('YYYY-MM');
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
-      await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'F2')
+      const { recordset: magamYn } = await pool.request().query`
+      SELECT MagamYn FROM GRCV_CT
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F2')
     `;
+
+      if (!magamYn[0].MagamYn) {
+        await pool.request().query`
+          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+          VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
+
+          UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
+          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F2')
+        `;
+      }
+
+      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
+      if (magamYn[0].MagamYn === '1') {
+        await pool.request().query`
+        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F2')
+      `;
+      }
     } else {
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'F2')
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F2')
       `;
     }
 
     await pool.request().query`
       MERGE INTO GSVC_F2_H
         USING (values (1)) AS Source (Number)
-        ON (CERTNO IS NOT NULL)
+        ON (CERTNO = ${H.CERTNO})
       WHEN MATCHED THEN
         UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
@@ -74,24 +112,37 @@ exports.inspection = async (req, res) => {
 
       MERGE INTO GSVC_F2_D2
         USING (values (1)) AS Source (Number)
-        ON (CERTNO IS NOT NULL)
-      WHEN MATCHED AND (confirm != ${D2.confirm} OR f_pressure != ${D2.f_pressure} OR f_depth != ${D2.f_depth} OR expiry_date != ${expiry_date} OR value1 != ${D2.value1} OR value2 != ${D2.value2} OR recommend != ${D2.recommend}) THEN
-        UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
+        ON (CERTNO = ${H.CERTNO})
+      WHEN MATCHED AND (confirm != ${confirm} OR f_pressure != ${f_pressure} OR f_depth != ${f_depth} OR expiry_date != ${expiry_date} OR value1 != ${value1} OR value2 != ${value2} OR recommend != ${recommend}) THEN
+        UPDATE SET confirm = ${confirm}, f_pressure = ${f_pressure}, f_depth = ${f_depth}, expiry_date = ${expiry_date}, value1 = ${value1}, value2 = ${value2}, recommend = ${recommend}, UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
-        INSERT (CERTNO, CERTSEQ, confirm, f_pressure, f_depth, expiry_date, value1, value2, recommend, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${D2.confirm}, ${D2.f_pressure}, ${D2.f_depth}, ${expiry_date}, ${D2.value1}, ${D2.value2}, ${D2.recommend}, ${ID}, ${ID});
+        INSERT (CERTNO, CERTSEQ, confirm, f_pressure, f_depth, expiry_date, value1, value2, recommend, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${confirm}, ${f_pressure}, ${f_depth}, ${expiry_date}, ${value1}, ${value2}, ${recommend}, ${ID}, ${ID});
     `;
+
+    let insertDt = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    if (H.CERTNO) {
+      const { recordset: insertInfo } = await pool.request().query`
+        SELECT IN_DT FROM GSVC_F2_D1
+        WHERE (CERTNO = ${H.CERTNO} AND CERTSEQ = 1)
+      `;
+      insertDt = insertInfo[0].IN_DT;
+
+      await pool.request().query`
+        SELECT * FROM GSVC_F2_D1 WHERE CERTNO = ${H.CERTNO}
+
+        BEGIN TRAN
+        DELETE FROM GSVC_F2_D1 WHERE CERTNO = ${H.CERTNO}
+        SELECT * FROM GSVC_F2_D1 WHERE CERTNO = ${H.CERTNO}
+        COMMIT TRAN
+      `;
+    }
 
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
-        MERGE INTO GSVC_F2_D1
-          USING (values (1)) AS Source (Number)
-          ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-        WHEN MATCHED AND (manuf != ${v.manuf} OR type != ${v.type} OR s_no != ${v.s_no} OR remark != ${v.remark}) THEN
-          UPDATE SET manuf = ${v.manuf}, type = ${v.type}, s_no = ${v.s_no}, remark = ${v.remark}, UP_ID = ${ID}, UP_DT = getDate()
-        WHEN NOT MATCHED THEN
-          INSERT (CERTNO, CERTSEQ, manuf, type, s_no, remark, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${v.manuf}, ${v.type}, ${v.s_no}, ${
-        v.remark
-      }, ${ID}, ${ID});
+          INSERT GSVC_F2_D1 (CERTNO, CERTSEQ, manuf, type, s_no, remark, IN_ID, IN_DT, UP_ID) VALUES (${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${
+        v.manuf
+      }, ${v.type}, ${v.s_no}, ${v.remark}, ${ID}, ${insertDt},${ID});
       `;
     });
 

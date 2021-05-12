@@ -68,8 +68,6 @@ exports.inspection = async (req, res) => {
   const pool = await sql.connect(config);
 
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   const { type } = req.params;
 
@@ -77,15 +75,25 @@ exports.inspection = async (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
-      await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B3')
+      const { recordset: magamYn } = await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
+
+        SELECT MagamYn FROM GRCV_CT
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
       `;
+
+      if (magamYn[0].MagamYn) {
+        await pool.request().query`
+          UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
+        `;
+      }
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'B3')
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
       `;
     }
 
@@ -98,7 +106,7 @@ exports.inspection = async (req, res) => {
       when matched then
         update set UP_ID = ${ID}, UP_DT = GetDate()
       when not matched then
-        insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
+        insert (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `;
 
     Object.values(D1).forEach(async (v, i) => {
@@ -106,11 +114,11 @@ exports.inspection = async (req, res) => {
         merge into GSVC_B3_D1
         using(values (1))
           as Source (Number)
-          on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
+          on (CERTNO = ${H.CERTNO || CERTNO[0]['']} and CERTSEQ = ${i + 1})
         when matched and (Unit != ${v.Unit} or Remark != ${v.Remark} or Value != ${v.Value}) then
           update set UP_ID = ${ID}, UP_DT = GetDate(), Value = ${v.Value}, Unit = ${v.Unit}, Remark = ${v.Remark}
         when not matched then
-          insert (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.Value}, ${v.Unit}, ${
+          insert (CERTNO, CERTSEQ, Value, Unit, Remark, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${v.Value}, ${v.Unit}, ${
         v.Remark
       }, ${ID}, ${ID});
       `;
@@ -120,7 +128,7 @@ exports.inspection = async (req, res) => {
       await pool.request().query`merge into GSVC_B3_D2
         using(values (1))
           as Source (Number)
-          on (CERTNO = ${CERTNO[0]['']} and CERTSEQ = ${i + 1})
+          on (CERTNO = ${H.CERTNO || CERTNO[0]['']} and CERTSEQ = ${i + 1})
         when matched and (CarriedOut != ${v.CarriedOut.toString()} or NotCarried != ${v.NotCarried.toString()} or NotApp != ${v.NotApp.toString()} or Comm != ${
         v.Comm
       }) then
@@ -128,9 +136,9 @@ exports.inspection = async (req, res) => {
         v.Comm
       }, UP_ID = ${ID}, UP_DT = GetDate()
         when not matched then
-          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${
-        v.NotCarried
-      }, ${v.NotApp}, ${v.Comm}, ${ID}, ${ID});
+          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${
+        v.CarriedOut
+      }, ${v.NotCarried}, ${v.NotApp}, ${v.Comm}, ${ID}, ${ID});
       `;
     });
 
@@ -138,11 +146,13 @@ exports.inspection = async (req, res) => {
       merge into GSVC_B3_D3
       using (values(1))
         as Source (Number)
-        on (CERTNO = ${CERTNO[0]['']})
-      when matched and (Value1 != ${D3[0]} or Value2 != ${D3[1]} or Value3 != ${D3[2]}) then
-        update set Value1 = ${D3[0]}, Value2 = ${D3[1]}, Value3 = ${D3[2]}, UP_ID = ${ID}, UP_DT = GetDate()
+        on (CERTNO = ${H.CERTNO || CERTNO[0]['']})
+      when matched and (Value1 != ${D3[0]} or Value2 != ${D3[1]} or Value3 != ${D3[2]} or Value4 != ${D3[3]}) then
+        update set Value1 = ${D3[0]}, Value2 = ${D3[1]}, Value3 = ${D3[2]}, Value4 = ${D3[3]}, UP_ID = ${ID}, UP_DT = GetDate()
       when not matched then
-        insert (CERTNO, CERTSEQ, Value1, Value2, Value3, IN_ID, UP_ID) values(${CERTNO[0]['']}, 1, ${D3[0]}, ${D3[1]}, ${D3[2]}, ${ID}, ${ID});
+        insert (CERTNO, CERTSEQ, Value1, Value2, Value3, Value4, IN_ID, UP_ID) values(${CERTNO[0]['']}, 1, ${D3[0]}, ${D3[1]}, ${D3[2]}, ${
+      D3[3]
+    }, ${ID}, ${ID});
       `;
 
     res.status(200).send();

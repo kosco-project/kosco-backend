@@ -66,13 +66,17 @@ router.get('/G', G.details);
 
 router.post('/G/inspection/:type', G.inspection);
 
+// H1, H3, H3_1
+router.get('/H1', H1H3H3_1.details);
+router.get('/H3', H1H3H3_1.details);
+router.get('/H3-1', H1H3H3_1.details);
+
 router.post('/H1/inspection/:type', H1H3H3_1.inspection);
+router.post('/H3/inspection/:type', H1H3H3_1.inspection);
+router.post('/H3-1/inspection/:type', H1H3H3_1.inspection);
 
 router.post('/H2/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H2-A/inspection/:type', H2H2AH4H41.inspection);
-
-router.post('/H3/inspection/:type', H1H3H3_1.inspection);
-router.post('/H3-1/inspection/:type', H1H3H3_1.inspection);
 
 router.post('/H4/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H4-1/inspection/:type', H2H2AH4H41.inspection);

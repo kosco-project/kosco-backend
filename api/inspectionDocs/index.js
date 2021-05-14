@@ -75,8 +75,15 @@ router.post('/H1/inspection/:type', H1H3H3_1.inspection);
 router.post('/H3/inspection/:type', H1H3H3_1.inspection);
 router.post('/H3-1/inspection/:type', H1H3H3_1.inspection);
 
+// H2, H2-A, H4, H4-1
+router.get('/H2', H2H2AH4H41.details);
+router.get('/H2-A', H2H2AH4H41.details);
+
 router.post('/H2/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H2-A/inspection/:type', H2H2AH4H41.inspection);
+
+router.get('/H4', H2H2AH4H41.details);
+router.get('/H4-1', H2H2AH4H41.details);
 
 router.post('/H4/inspection/:type', H2H2AH4H41.inspection);
 router.post('/H4-1/inspection/:type', H2H2AH4H41.inspection);

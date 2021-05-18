@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
+const moment = require('moment');
 const config = require('../../lib/configDB');
 
 require('dotenv').config();
@@ -12,23 +13,29 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT [GSVC_I-1_D1].Value FROM [GSVC_I-1_D1]
-        WHERE [GSVC_I-1_D1].CERTNO = ${ct}
+        SELECT CylnType, Type, MFGDt, SerialNo, Pressure, Perform FROM [GSVC_I-1_D1]
+        WHERE CERTNO = ${ct}
       `;
     const { recordset: D2 } = await pool.request().query`
-        SELECT [GSVC_I-1_D1].Value FROM [GSVC_I-1_D1]
-        WHERE [GSVC_I-1_D1].CERTNO = ${ct}
+        SELECT Value FROM [GSVC_I-1_D2]
+        WHERE CERTNO = ${ct}
     `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1arr = D1.map(({ CylnType, Type, MFGDt, SerialNo, Pressure, Perform }, i) => ({
+      [i]: {
+        CylnType,
+        Type,
+        MFGDt,
+        SerialNo,
+        Pressure,
+        Perform,
+      },
+    }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
-
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
-    const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
-
+    console.log(D2);
     res.json({
       D1: D1obj,
-      D2: D2obj,
+      D2: D2[0].Value,
     });
   } catch (e) {
     console.log(e);
@@ -46,8 +53,6 @@ exports.inspection = async (req, res) => {
   const pool = await sql.connect(config);
 
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   const { type } = req.params;
 
@@ -55,15 +60,32 @@ exports.inspection = async (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
-      await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'I-1')
+      const { recordset: magamYn } = await pool.request().query`
+      SELECT MagamYn FROM GRCV_CT
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'I-1')
+    `;
+
+      if (!magamYn[0].MagamYn) {
+        await pool.request().query`
+        INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+        VALUES (${H.CERTNO || CERTNO[0]['']}, 'I-1', 1, 1, ${ID}, ${ID})
+
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'I-1')
       `;
+      }
+
+      if (magamYn[0].MagamYn === '1') {
+        await pool.request().query`
+        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'I-1')
+      `;
+      }
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'I-1')
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'I-1')
       `;
     }
 
@@ -72,7 +94,7 @@ exports.inspection = async (req, res) => {
       MERGE INTO [GSVC_I-1_H]
         USING(values (1))
           AS Source (Number)
-          ON (CERTNO IS NOT NULL)
+          ON (CERTNO = ${H.CERTNO})
         WHEN MATCHED THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = GetDate()
         WHEN NOT MATCHED THEN
@@ -81,30 +103,38 @@ exports.inspection = async (req, res) => {
       MERGE INTO [GSVC_I-1_D2]
         USING(values (1))
           AS Source (Number)
-          ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 1)
+          ON (CERTNO = ${H.CERTNO} AND CERTSEQ = 1)
         WHEN MATCHED AND (Value != ${D2}) THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), Value = ${D2}
         WHEN NOT MATCHED THEN
           INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 1, ${D2}, ${ID}, ${ID});
     `;
 
-    Object.values(D1).forEach(async (v, i) => {
-      const MFGDt = new Date(v.MFGDt.substring(0, 10)).toFormat('MMM.YY');
+    let insertDt = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    if (H.CERTNO) {
+      const { recordset: insertInfo } = await pool.request().query`
+        SELECT IN_DT FROM [GSVC_I-1_D1]
+        WHERE (CERTNO = ${H.CERTNO} AND CERTSEQ = 1)
+      `;
+      insertDt = insertInfo[0].IN_DT;
+
       await pool.request().query`
-        MERGE INTO [GSVC_I-1_D1]
-          USING(values (1))
-            AS Source (Number)
-            ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
-          WHEN MATCHED AND (CylnType != ${v.CylnType} OR Type != ${v.Type} OR MFGDt != ${MFGDt} OR SerialNo != ${v.SerialNo} OR Pressure != ${
-        v.Pressure
-      } OR Perform != ${v.Perform}) THEN
-            UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), CylnType = ${v.CylnType}, Type = ${v.Type}, MFGDt = ${MFGDt}, SerialNo = ${
-        v.SerialNo
-      }, Pressure = ${v.Pressure}, Perform = ${v.Perform}
-          WHEN NOT MATCHED THEN
-            INSERT (CERTNO, CERTSEQ, CylnType, Type, MFGDt, SerialNo, Pressure, Perform, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${i + 1}, ${
-        v.CylnType
-      }, ${v.Type}, ${MFGDt}, ${v.SerialNo}, ${v.Pressure}, ${v.Perform},  ${ID}, ${ID});
+        SELECT * FROM [GSVC_I-1_D1] WHERE CERTNO = ${H.CERTNO}
+
+        BEGIN TRAN
+        DELETE FROM [GSVC_I-1_D1] WHERE CERTNO = ${H.CERTNO}
+        SELECT * FROM [GSVC_I-1_D1] WHERE CERTNO = ${H.CERTNO}
+        COMMIT TRAN
+      `;
+    }
+
+    Object.values(D1).forEach(async (v, i) => {
+      const MFGDt = moment(v.MFGDt).format('YYYY-MM');
+      await pool.request().query`
+        INSERT (CERTNO, CERTSEQ, CylnType, Type, MFGDt, SerialNo, Pressure, Perform, IN_ID, IN_DT, UP_ID) VALUES(${H.CERTNO || CERTNO[0]['']}, ${
+        i + 1
+      }, ${v.CylnType}, ${v.Type}, ${MFGDt}, ${v.SerialNo}, ${v.Pressure}, ${v.Perform},  ${ID}, ${insertDt}, ${ID});
       `;
     });
 

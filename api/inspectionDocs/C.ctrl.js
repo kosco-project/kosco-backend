@@ -106,11 +106,11 @@ exports.inspection = async (req, res) => {
         merge into GSVC_C_D1
         using(values (1))
           as Source (Number)
-          on (CERTNO = ${H.CERTNO || CERTNO[0]['']} and CERTSEQ = ${i + 1})
+          on (CERTNO = ${H.CERTNO} and CERTSEQ = ${i + 1})
         when matched and (Value != ${v}) then
           update set Value = ${v}, UP_ID = ${ID}, UP_DT = GetDate()
         when not matched then
-          insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${v}, ${ID}, ${ID});
+          insert (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v}, ${ID}, ${ID});
       `;
     });
 
@@ -118,7 +118,7 @@ exports.inspection = async (req, res) => {
       await pool.request().query`merge into GSVC_C_D2
         using(values (1))
           as Source (Number)
-          on (CERTNO = ${H.CERTNO || CERTNO[0]['']} and CERTSEQ = ${i + 1})
+          on (CERTNO = ${H.CERTNO} and CERTSEQ = ${i + 1})
         when matched and (CarriedOut != ${v.CarriedOut.toString()} or NotCarried != ${v.NotCarried.toString()} or NotApp != ${v.NotApp.toString()} or Comm != ${
         v.Comm
       }) then
@@ -126,9 +126,9 @@ exports.inspection = async (req, res) => {
         v.Comm
       }, UP_ID = ${ID}, UP_DT = GetDate()
         when not matched then
-          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${
-        v.CarriedOut
-      }, ${v.NotCarried}, ${v.NotApp}, ${v.Comm}, ${ID}, ${ID});
+          insert (CERTNO, CERTSEQ, CarriedOut, NotCarried, NotApp, Comm, IN_ID, UP_ID) values(${CERTNO[0]['']}, ${i + 1}, ${v.CarriedOut}, ${
+        v.NotCarried
+      }, ${v.NotApp}, ${v.Comm}, ${ID}, ${ID});
       `;
     });
 

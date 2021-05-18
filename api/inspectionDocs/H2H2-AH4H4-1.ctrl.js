@@ -138,7 +138,7 @@ exports.inspection = async (req, res) => {
 
       `);
 
-    let insertDt = moment().format('YYYY-MM-DD HH:mm:ss');
+    let insertDt = moment().add(9, 'h').format('YYYY-MM-DD HH:mm:ss');
 
     if (H.CERTNO) {
       const { recordset: insertInfo } = await pool.request().input('CERTNO', sql.NChar, H.CERTNO).input('path', sql.NChar, path).query(`
@@ -146,7 +146,7 @@ exports.inspection = async (req, res) => {
           WHERE (CERTNO = @CERTNO AND CERTSEQ = 1)
         `);
 
-      insertDt = insertInfo[0].IN_DT;
+      insertDt = moment(insertInfo[0].IN_DT).add(9, 'h').format('YYYY-MM-DD HH:mm:ss');
       console.log(insertDt, new Date(insertDt));
       await pool.request().input('CERTNO', sql.NChar, H.CERTNO).input('path', sql.NChar, path).query(`
           SELECT * FROM [GSVC_${path}_D1] WHERE CERTNO = @CERTNO
@@ -166,7 +166,7 @@ exports.inspection = async (req, res) => {
         .input('path', sql.NChar, path)
         .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
         .input('CERTSEQ', sql.NChar, i + 1)
-        .input('insertDt', sql.DateTimeOffset, insertDt)
+        .input('insertDt', sql.DateTime, insertDt)
         .input('CylnType', sql.NChar, v.CylnType)
         .input('Volume', sql.NChar, v.Volume)
         .input('WorkPress', sql.NChar, v.WorkPress)

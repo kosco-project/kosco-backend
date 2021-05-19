@@ -102,7 +102,7 @@ exports.inspection = async (req, res) => {
       }
     } else {
       await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'OX2')
       `;
     }

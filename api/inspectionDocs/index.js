@@ -108,6 +108,9 @@ router.get('/OX2', OX2.details);
 
 router.post('/OX2/inspection/:type', OX2.inspection);
 
+// P1
+router.get('/P1', P1.details);
+
 router.post('/P1/inspection/:type', P1.inspection);
 
 router.post('/W/inspection/:type', WW1.inspection);

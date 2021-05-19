@@ -80,7 +80,7 @@ exports.inspection = async (req, res) => {
       if (!magamYn[0].MagamYn) {
         await pool.request().query`
           INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-          VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
+          VALUES (${CERTNO[0]['']}, 'F2', 1, 1, ${ID}, ${ID})
 
           UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
           WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F2')

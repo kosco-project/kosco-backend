@@ -8,23 +8,24 @@ exports.details = async (req, res) => {
   try {
     const pool = await sql.connect(config);
 
-    const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_L1_D1.Value FROM GSVC_L1_D1
-        WHERE GSVC_L1_D1.CERTNO = ${ct}
-      `;
     const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_L1_D2.Value FROM GSVC_L1_D2
-        WHERE GSVC_L1_D2.CERTNO = ${ct}
+        SELECT DESCT, Value1, Value2, Value3, Value4 FROM GSVC_L1_D2
+        WHERE CERTNO = ${ct}
     `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
-    const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
-
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2arr = D2.map(({ DESCT, Value1, Value2, Value3, Value4 }, i) => ({
+      [i]: {
+        DESCT,
+        Value1,
+        Value2,
+        Value3,
+        Value4,
+      },
+    }));
     const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
 
     res.json({
-      D1: D1obj,
+      D1: {},
       D2: D2obj,
     });
   } catch (e) {
@@ -43,8 +44,6 @@ exports.inspection = async (req, res) => {
   const pool = await sql.connect(config);
 
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   const { type } = req.params;
 
@@ -58,15 +57,33 @@ exports.inspection = async (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET);
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
-      await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'L1')
+      const { recordset: magamYn } = await pool.request().query`
+      SELECT MagamYn FROM GRCV_CT
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
+    `;
+
+      if (!magamYn[0].MagamYn) {
+        await pool.request().query`
+          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+          VALUES (${CERTNO[0]['']}, 'L1', 1, 1, ${ID}, ${ID})
+
+          UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
+          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
+        `;
+      }
+
+      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
+      if (magamYn[0].MagamYn === '1') {
+        await pool.request().query`
+        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
       `;
+      }
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`
         UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = 'L1')
+        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
       `;
     }
 
@@ -75,42 +92,40 @@ exports.inspection = async (req, res) => {
       MERGE INTO GSVC_L1_H
         USING(values (1))
           AS Source (Number)
-          ON (CERTNO IS NOT NULL)
+          ON (CERTNO = ${H.CERTNO})
         WHEN MATCHED THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = GetDate()
         WHEN NOT MATCHED THEN
           INSERT (CERTNO, CERTDT, VESSELNM, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
       `;
 
-    Object.values(D2)
-      .slice(0, 2)
-      .forEach(async (v, i) => {
-        await pool.request().query`
+    Object.values(D2).forEach(async (v, i) => {
+      await pool.request().query`
           MERGE INTO GSVC_L1_D2
             USING(values (1))
               AS Source (Number)
-              ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = ${i + 1})
+              ON (CERTNO = ${H.CERTNO} AND CERTSEQ = ${i + 1})
             WHEN MATCHED AND (Value1 != ${v.Value1} OR Value2 != ${v.Value2} OR Value3 != ${v.Value3} OR Value4 != ${v.Value4}) THEN
               UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), DESCT = ${v.DESCT}, Value1 = ${v.Value1}, Value2 = ${v.Value2}, Value3 = ${
-          v.Value3
-        }, Value4 = ${v.Value4}
+        v.Value3
+      }, Value4 = ${v.Value4}
             WHEN NOT MATCHED THEN
               INSERT (CERTNO, CERTSEQ, DESCT, Value1, Value2, Value3, Value4, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, ${i + 1}, ${v.DESCT}, ${
-          v.Value1
-        }, ${v.Value2}, ${v.Value3}, ${v.Value4}, ${ID}, ${ID});
+        v.Value1
+      }, ${v.Value2}, ${v.Value3}, ${v.Value4}, ${ID}, ${ID});
         `;
-      });
+    });
 
-    await pool.request().query`
-          MERGE INTO GSVC_L1_D2
-            USING(values (1))
-              AS Source (Number)
-              ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 3)
-            WHEN MATCHED AND (Value1 != ${ExpiryDate[0]} OR Value2 != ${ExpiryDate[1]} OR Value3 != ${ExpiryDate[2]} OR Value4 != ${ExpiryDate[3]}) THEN
-              UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), DESCT = ${ExpiryDateDESCT}, Value1 = ${ExpiryDate[0]}, Value2 = ${ExpiryDate[1]}, Value3 = ${ExpiryDate[2]}, Value4 = ${ExpiryDate[3]}
-            WHEN NOT MATCHED THEN
-              INSERT (CERTNO, CERTSEQ, DESCT, Value1, Value2, Value3, Value4, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 3, ${ExpiryDateDESCT}, ${ExpiryDate[0]}, ${ExpiryDate[1]}, ${ExpiryDate[2]}, ${ExpiryDate[3]}, ${ID}, ${ID});
-        `;
+    // await pool.request().query`
+    //       MERGE INTO GSVC_L1_D2
+    //         USING(values (1))
+    //           AS Source (Number)
+    //           ON (CERTNO = ${CERTNO[0]['']} AND CERTSEQ = 3)
+    //         WHEN MATCHED AND (Value1 != ${ExpiryDate[0]} OR Value2 != ${ExpiryDate[1]} OR Value3 != ${ExpiryDate[2]} OR Value4 != ${ExpiryDate[3]}) THEN
+    //           UPDATE SET UP_ID = ${ID}, UP_DT = GetDate(), DESCT = ${ExpiryDateDESCT}, Value1 = ${ExpiryDate[0]}, Value2 = ${ExpiryDate[1]}, Value3 = ${ExpiryDate[2]}, Value4 = ${ExpiryDate[3]}
+    //         WHEN NOT MATCHED THEN
+    //           INSERT (CERTNO, CERTSEQ, DESCT, Value1, Value2, Value3, Value4, IN_ID, UP_ID) VALUES(${CERTNO[0]['']}, 3, ${ExpiryDateDESCT}, ${ExpiryDate[0]}, ${ExpiryDate[1]}, ${ExpiryDate[2]}, ${ExpiryDate[3]}, ${ID}, ${ID});
+    //     `;
 
     res.status(200).send();
   } catch (e) {

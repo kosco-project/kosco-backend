@@ -10,23 +10,35 @@ exports.details = async (req, res) => {
     const pool = await sql.connect(config);
 
     const { recordset: D1 } = await pool.request().query`
-        SELECT GSVC_${path}_D1.Value FROM GSVC_${path}_D1
-        WHERE GSVC_${path}_D1.CERTNO = ${ct}
+        SELECT Value FROM GSVC_${path}_D1
+        WHERE CERTNO = ${ct}
       `;
     const { recordset: D2 } = await pool.request().query`
-        SELECT GSVC_${path}_D2.Value FROM GSVC_${path}_D2
-        WHERE GSVC_${path}_D2.CERTNO = ${ct}
+        SELECT CarriedOut, NotCarried, NotApp, Comm FROM GSVC_${path}_D2
+        WHERE CERTNO = ${ct}
+    `;
+    const { recordset: D3 } = await pool.request().query`
+        SELECT Value FROM GSVC_${path}_D3
+        WHERE CERTNO = ${ct}
     `;
 
-    const D1arr = D1.map((item, i) => ({ [i]: item.Value }));
+    const D1arr = D1.map(({ Value }, i) => ({ [i]: Value }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
 
-    const D2arr = D2.map((item, i) => ({ [i]: +item.Value }));
+    const D2arr = D2.map((item, i) => ({
+      [i]: {
+        CarriedOut: +item.CarriedOut,
+        NotCarried: +item.NotCarried,
+        NotApp: +item.NotApp,
+        Comm: item.Comm,
+      },
+    }));
     const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});
 
     res.json({
       D1: D1obj,
       D2: D2obj,
+      D3: D3[0].Value,
     });
   } catch (e) {
     console.log(e);
@@ -46,20 +58,40 @@ exports.inspection = async (req, res) => {
   const pool = await sql.connect(config);
 
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
-  const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   try {
     if (type === 'save') {
-      await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = ${path})
-    `;
+      const { recordset: magamYn } = await pool.request().input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
+      SELECT MagamYn FROM GRCV_CT
+      WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+    `);
+
+      if (!magamYn[0].MagamYn) {
+        await pool.request().input('CERTNO', sql.NChar, CERTNO[0]['']).input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
+          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+          VALUES (@CERTNO, @path, 1, 1, ${ID}, ${ID})
+
+          UPDATE GRCV_CT SET Cert_No = @CERTNO, MagamYn = 0, IN_ID = ${ID}
+          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+        `);
+      }
+
+      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
+      if (magamYn[0].MagamYn === '1') {
+        await pool.request().input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
+        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+        WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+      `);
+      }
     } else {
-      await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RcvNo} AND Doc_No = ${path})
-      `;
+      await pool
+        .request()
+        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+        .input('path', sql.NChar, path)
+        .input('RCVNO', sql.NChar, RCVNO).query(`
+        UPDATE GRCV_CT SET Cert_No = @CERTNO, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
+        WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+      `);
     }
 
     await pool
@@ -67,10 +99,11 @@ exports.inspection = async (req, res) => {
       .input('path', sql.NChar, path)
       .input('value', sql.NChar, D3)
       .input('CERTNO', sql.NChar, CERTNO[0][''])
+      .input('cert_no', sql.NChar, H.CERTNO)
       .input('VESSELNM', sql.NChar, VESSELNM).query(`
       MERGE INTO GSVC_${path}_H
         USING (values (1)) AS Source (Number)
-          ON (CERTNO IS NOT NULL)
+          ON (CERTNO = @cert_no)
         WHEN MATCHED THEN
           UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
@@ -78,7 +111,7 @@ exports.inspection = async (req, res) => {
 
       MERGE INTO GSVC_${path}_D3
         USING (values (1)) AS Source (Number)
-          ON (CERTNO = @CERTNO)
+          ON (CERTNO = @cert_no)
       WHEN MATCHED THEN
         UPDATE SET Value = @value, UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
@@ -91,10 +124,11 @@ exports.inspection = async (req, res) => {
         .input('path', sql.NChar, path)
         .input('value', sql.NChar, v)
         .input('CERTNO', sql.NChar, CERTNO[0][''])
+        .input('cert_no', sql.NChar, H.CERTNO)
         .input('CERTSEQ', sql.NChar, i + 1).query(`
         MERGE INTO GSVC_${path}_D1
           USING (values (1)) AS Source (Number)
-          ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
+          ON (CERTNO = @cert_no AND CERTSEQ = @CERTSEQ)
         WHEN MATCHED AND (Value != @value) THEN
           UPDATE SET Value = @value, UP_ID = ${ID}, UP_DT = getDate()
         WHEN NOT MATCHED THEN
@@ -107,6 +141,7 @@ exports.inspection = async (req, res) => {
         .request()
         .input('path', sql.NChar, path)
         .input('CERTNO', sql.NChar, CERTNO[0][''])
+        .input('cert_no', sql.NChar, H.CERTNO)
         .input('CarriedOut', sql.NChar, v.CarriedOut)
         .input('NotCarried', sql.NChar, v.NotCarried)
         .input('NotApp', sql.NChar, v.NotApp)
@@ -114,7 +149,7 @@ exports.inspection = async (req, res) => {
         .input('CERTSEQ', sql.NChar, i + 1).query(`
           MERGE INTO GSVC_${path}_D2
             USING (values (1)) AS Source (Number)
-            ON (CERTNO = @CERTNO AND CERTSEQ = @CERTSEQ)
+            ON (CERTNO = @cert_no AND CERTSEQ = @CERTSEQ)
           WHEN MATCHED AND (CarriedOut != @CarriedOut OR NotCarried != @NotCarried OR NotApp != @NotApp OR Comm != @Comm) THEN
             UPDATE SET CarriedOut = @CarriedOut, NotCarried = @NotCarried, NotApp = @NotApp, Comm = @Comm, UP_ID = ${ID}, UP_DT = getDate()
           WHEN NOT MATCHED THEN

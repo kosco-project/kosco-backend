@@ -47,38 +47,26 @@ exports.inspection = async (req, res) => {
 
   const { type } = req.params;
 
-  const ExpiryDate = Object.values(D2[2])
-    .slice(1, 5)
-    .map(date => new Date(date.substring(0, 10)).toFormat('MMM.YY'));
-
-  const ExpiryDateDESCT = D2[2].DESCT;
-
   try {
     jwt.verify(token, process.env.JWT_SECRET);
-    if (type === 'save') {
-      // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
-      const { recordset: magamYn } = await pool.request().query`
-      SELECT MagamYn FROM GRCV_CT
-      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
+
+    const { recordset: magamYn } = await pool.request().query`
+    SELECT MagamYn FROM GRCV_CT
+    WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
+  `;
+
+    if (!magamYn[0].MagamYn) {
+      await pool.request().query`
+      INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+      VALUES (${CERTNO[0]['']}, 'L1', 1, 1, ${ID}, ${ID})
     `;
+    }
 
-      if (!magamYn[0].MagamYn) {
-        await pool.request().query`
-          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-          VALUES (${CERTNO[0]['']}, 'L1', 1, 1, ${ID}, ${ID})
-
-          UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
-          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
-        `;
-      }
-
-      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
-      if (magamYn[0].MagamYn === '1') {
-        await pool.request().query`
-        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = ''
+    if (type === 'save') {
+      await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'L1')
       `;
-      }
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`

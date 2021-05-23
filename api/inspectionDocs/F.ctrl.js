@@ -54,28 +54,24 @@ exports.inspection = async (req, res) => {
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
-    if (type === 'save') {
-      const { recordset: magamYn } = await pool.request().query`
+
+    const { recordset: magamYn } = await pool.request().query`
       SELECT MagamYn FROM GRCV_CT
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F')
     `;
 
-      if (!magamYn[0].MagamYn) {
-        await pool.request().query`
+    if (!magamYn[0].MagamYn) {
+      await pool.request().query`
         INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-        VALUES (${H.CERTNO || CERTNO[0]['']}, 'F', 1, 1, ${ID}, ${ID})
+        VALUES (${CERTNO[0]['']}, 'F', 1, 1, ${ID}, ${ID})
+      `;
+    }
 
-        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
+    if (type === 'save') {
+      await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F')
       `;
-      }
-
-      if (magamYn[0].MagamYn === '1') {
-        await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
-        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'F')
-      `;
-      }
     } else {
       await pool.request().query`
         UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()

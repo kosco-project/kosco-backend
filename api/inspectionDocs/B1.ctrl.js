@@ -60,30 +60,25 @@ exports.inspection = async (req, res) => {
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
-    if (type === 'save') {
-      // 마감 한 문서 => 임시 저장 => 임시 저장 문서로 변경
-      const { recordset: magamYn } = await pool.request().query`
+
+    const { recordset: magamYn } = await pool.request().query`
       SELECT MagamYn FROM GRCV_CT
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
     `;
 
-      if (!magamYn[0].MagamYn) {
-        await pool.request().query`
-          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-          VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
+    if (!magamYn[0].MagamYn) {
+      await pool.request().query`
+        INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+        VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
+      `;
+    }
 
-          UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
-          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
-        `;
-      }
-
-      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
-      if (magamYn[0].MagamYn === '1') {
-        await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+    if (type === 'save') {
+      // 마감 한 문서 => 임시 저장 => 임시 저장 문서로 변경
+      await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B1')
       `;
-      }
     } else {
       // 검사 완료
       await pool.request().query`

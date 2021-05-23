@@ -80,8 +80,6 @@ exports.inspection = async (req, res) => {
 
   const pool = await sql.connect(config);
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001',${CERTDT}, ${ID})`;
-  // const { recordset: RcvNos } = await pool.request().query`SELECT RcvNo FROM GRCV_CT WHERE (RcvNo = ${RCVNO})`;
-  // const RcvNo = RcvNos.map(({ RcvNo }) => RcvNo)[0];
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
@@ -90,28 +88,34 @@ exports.inspection = async (req, res) => {
     await updateQuery('D1', D1, path, H.CERTNO || CERTNO[0][''], ID, VESSELNM, CERTDT);
     await updateQuery('D2', D2, path, H.CERTNO || CERTNO[0][''], ID, VESSELNM, CERTDT);
 
-    if (type === 'save') {
-      // GRCV_CT 테이블에서 CERT_NO 삽입
-      // 이전에 검사 완료된 문서인지 확인
-      const { recordset: magamYn } = await pool
-        .request()
-        .input('path', sql.NChar, path)
-        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
-        .input('RCVNO', sql.NChar, RCVNO).query(`
-          UPDATE GRCV_CT SET CERT_NO = @CERTNO, UP_ID = ${ID}, UP_DT = getDate()
-          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
-
-          SELECT MagamYn FROM GRCV_CT
-          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+    const { recordset: magamYn } = await pool
+      .request()
+      .input('path', sql.NChar, path)
+      .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+      .input('RCVNO', sql.NChar, RCVNO).query(`
+        SELECT MagamYn FROM GRCV_CT
+        WHERE (RcvNo = @RCVNO AND Doc_No = @path)
       `);
 
-      // 만약 이전에 검사완료 한 문서를 임시저장한다면 MagamYn을 0으로 변경
-      if (magamYn[0].MagamYn) {
-        await pool.request().input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
-          UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
-          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
-        `);
-      }
+    if (!magamYn[0].MagamYn) {
+      await pool
+        .request()
+        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+        .input('path', sql.NChar, path).query(`
+      INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+      VALUES (@CERTNO, @path, 1, 1, ${ID}, ${ID})
+    `);
+    }
+
+    if (type === 'save') {
+      await pool
+        .request()
+        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+        .input('path', sql.NChar, path)
+        .input('RCVNO', sql.NChar, RCVNO).query(`
+      UPDATE GRCV_CT SET CERT_NO = @CERTNO, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
+      WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+    `);
     } else {
       // COMPLETE -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool

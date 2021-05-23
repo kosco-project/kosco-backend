@@ -73,22 +73,25 @@ exports.inspection = async (req, res) => {
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
+
+    const { recordset: magamYn } = await pool.request().query`
+    SELECT MagamYn FROM GRCV_CT
+    WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
+  `;
+
+    if (!magamYn[0].MagamYn) {
+      await pool.request().query`
+      INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+      VALUES (${CERTNO[0]['']}, 'B3', 1, 1, ${ID}, ${ID})
+    `;
+    }
+
     if (type === 'save') {
       // 임시저장 시 GRCV_CT 테이블에 데이터 삽입
-      const { recordset: magamYn } = await pool.request().query`
-        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, UP_ID = ${ID}, UP_DT = getDate()
-        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
-
-        SELECT MagamYn FROM GRCV_CT
-        WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
-      `;
-
-      if (magamYn[0].MagamYn) {
-        await pool.request().query`
-          UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
-          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
-        `;
-      }
+      await pool.request().query`
+      UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
+      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'B3')
+    `;
     } else {
       // complete -> 검사완료 시 GRCV_CT 테이블에 데이터 삽입
       await pool.request().query`

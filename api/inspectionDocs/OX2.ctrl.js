@@ -77,29 +77,24 @@ exports.inspection = async (req, res) => {
 
   try {
     jwt.verify(token, process.env.JWT_SECRET);
-    if (type === 'save') {
-      const { recordset: magamYn } = await pool.request().query`
-      SELECT MagamYn FROM GRCV_CT
-      WHERE (RcvNo = ${RCVNO} AND Doc_No = 'OX2')
+
+    const { recordset: magamYn } = await pool.request().query`
+    SELECT MagamYn FROM GRCV_CT
+    WHERE (RcvNo = ${RCVNO} AND Doc_No = 'OX2')
+  `;
+
+    if (!magamYn[0].MagamYn) {
+      await pool.request().query`
+      INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+      VALUES (${CERTNO[0]['']}, 'OX2', 1, 1, ${ID}, ${ID})
     `;
+    }
 
-      if (!magamYn[0].MagamYn) {
-        await pool.request().query`
-          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-          VALUES (${CERTNO[0]['']}, 'OX2', 1, 1, ${ID}, ${ID})
-
-          UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
-          WHERE (RcvNo = ${RCVNO} AND Doc_No = 'OX2')
-        `;
-      }
-
-      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
-      if (magamYn[0].MagamYn === '1') {
-        await pool.request().query`
-        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+    if (type === 'save') {
+      await pool.request().query`
+        UPDATE GRCV_CT SET CERT_NO = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'OX2')
       `;
-      }
     } else {
       await pool.request().query`
         UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 1, MagamDt = ${CERTDT}, UP_ID = ${ID}, UP_DT = getDate()
@@ -119,7 +114,7 @@ exports.inspection = async (req, res) => {
       MERGE INTO GSVC_OX2_D3
         USING (values (1)) AS Source (Number)
         ON (CERTNO = ${H.CERTNO})
-      WHEN MATCHED AND (Value != ${D3}) THEN
+      WHEN MATCHED THEN
         UPDATE SET Value = ${D3}, UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
         INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${D3}, ${ID}, ${ID});
@@ -154,15 +149,19 @@ exports.inspection = async (req, res) => {
 
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
-          INSERT (CERTNO, CERTSEQ, SetNo1, SetNo2, SetNo3, SetNo4, SetNo5, SetNo6, SetNo7, SetNo8, IN_ID, IN_DT, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${v.SetNo1}, ${v.SetNo2}, ${v.SetNo3}, ${v.SetNo4}, ${v.SetNo5}, ${v.SetNo6}, ${v.SetNo7}, ${v.SetNo8}, ${ID}, ${insertDt}, ${ID});
+          INSERT GSVC_OX2_D1 (CERTNO, CERTSEQ, SetNo1, SetNo2, SetNo3, SetNo4, SetNo5, SetNo6, SetNo7, SetNo8, IN_ID, IN_DT, UP_ID)
+          VALUES (${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${v.SetNo1}, ${v.SetNo2}, ${v.SetNo3}, ${v.SetNo4}, ${v.SetNo5}, ${v.SetNo6}, ${
+        v.SetNo7
+      }, ${v.SetNo8}, ${ID}, ${insertDt}, ${ID});
       `;
     });
 
     Object.values(D2).forEach(async (v, i) => {
       await pool.request().query`
-          INSERT (CERTNO, CERTSEQ, Manuf, Volume, WorkPress, SerialNo, TestDt, Perform, IN_ID, IN_DT, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${
-        v.Manuf
-      }, ${v.Volume}, ${v.WorkPress}, ${v.SerialNo}, ${v.TestDt}, ${v.Perform}, ${ID}, ${insertDt}, ${ID});
+          INSERT GSVC_OX2_D2 (CERTNO, CERTSEQ, Manuf, Volume, WorkPress, SerialNo, TestDt, Perform, IN_ID, IN_DT, UP_ID)
+          VALUES (${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${v.Manuf}, ${v.Volume}, ${v.WorkPress}, ${v.SerialNo}, ${v.TestDt}, ${
+        v.Perform
+      }, ${ID}, ${insertDt}, ${ID});
       `;
     });
 

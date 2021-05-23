@@ -9,18 +9,19 @@ exports.details = async (req, res) => {
   try {
     const pool = await sql.connect(config);
 
-    const { recordset: D1 } = await pool.request().query`
+    const { recordset: D1 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT Value FROM GSVC_${path}_D1
-        WHERE CERTNO = ${ct}
-      `;
-    const { recordset: D2 } = await pool.request().query`
+        WHERE CERTNO = @ct
+      `);
+
+    const { recordset: D2 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT CarriedOut, NotCarried, NotApp, Comm FROM GSVC_${path}_D2
-        WHERE CERTNO = ${ct}
-    `;
-    const { recordset: D3 } = await pool.request().query`
+        WHERE CERTNO = @ct
+    `);
+    const { recordset: D3 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT Value FROM GSVC_${path}_D3
-        WHERE CERTNO = ${ct}
-    `;
+        WHERE CERTNO = @ct
+    `);
 
     const D1arr = D1.map(({ Value }, i) => ({ [i]: Value }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
@@ -60,29 +61,35 @@ exports.inspection = async (req, res) => {
   const { recordset: CERTNO } = await pool.request().query`SELECT dbo.GD_F_NO('CT','002001', ${CERTDT}, ${ID})`;
 
   try {
-    if (type === 'save') {
-      const { recordset: magamYn } = await pool.request().input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
-      SELECT MagamYn FROM GRCV_CT
-      WHERE (RcvNo = @RCVNO AND Doc_No = @path)
-    `);
+    jwt.verify(token, process.env.JWT_SECRET);
 
-      if (!magamYn[0].MagamYn) {
-        await pool.request().input('CERTNO', sql.NChar, CERTNO[0]['']).input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
-          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-          VALUES (@CERTNO, @path, 1, 1, ${ID}, ${ID})
-
-          UPDATE GRCV_CT SET Cert_No = @CERTNO, MagamYn = 0, IN_ID = ${ID}
-          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
-        `);
-      }
-
-      // 완료한 문서를 임시 저장하면 magam을 다시 0으로
-      if (magamYn[0].MagamYn === '1') {
-        await pool.request().input('path', sql.NChar, path).input('RCVNO', sql.NChar, RCVNO).query(`
-        UPDATE GRCV_CT SET MagamYn = 0, MagamDt = ''
+    const { recordset: magamYn } = await pool
+      .request()
+      .input('path', sql.NChar, path)
+      .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+      .input('RCVNO', sql.NChar, RCVNO).query(`
+        SELECT MagamYn FROM GRCV_CT
         WHERE (RcvNo = @RCVNO AND Doc_No = @path)
       `);
-      }
+
+    if (!magamYn[0].MagamYn) {
+      await pool
+        .request()
+        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+        .input('path', sql.NChar, path).query(`
+          INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+          VALUES (@CERTNO, @path, 1, 1, ${ID}, ${ID})
+        `);
+    }
+    if (type === 'save') {
+      await pool
+        .request()
+        .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
+        .input('path', sql.NChar, path)
+        .input('RCVNO', sql.NChar, RCVNO).query(`
+          UPDATE GRCV_CT SET CERT_NO = @CERTNO, MagamYn = 0, MagamDt = '', UP_ID = ${ID}, UP_DT = getDate()
+          WHERE (RcvNo = @RCVNO AND Doc_No = @path)
+      `);
     } else {
       await pool
         .request()

@@ -113,6 +113,10 @@ router.get('/P1', P1.details);
 
 router.post('/P1/inspection/:type', P1.inspection);
 
+// W, W1
+router.get('/W', WW1.details);
+router.get('/W1', WW1.details);
+
 router.post('/W/inspection/:type', WW1.inspection);
 router.post('/W1/inspection/:type', WW1.inspection);
 

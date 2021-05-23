@@ -9,18 +9,19 @@ exports.details = async (req, res) => {
   try {
     const pool = await sql.connect(config);
 
-    const { recordset: D1 } = await pool.request().query`
+    const { recordset: D1 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT Value FROM GSVC_${path}_D1
-        WHERE CERTNO = ${ct}
-      `;
-    const { recordset: D2 } = await pool.request().query`
+        WHERE CERTNO = @ct
+      `);
+
+    const { recordset: D2 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT CarriedOut, NotCarried, NotApp, Comm FROM GSVC_${path}_D2
-        WHERE CERTNO = ${ct}
-    `;
-    const { recordset: D3 } = await pool.request().query`
+        WHERE CERTNO = @ct
+    `);
+    const { recordset: D3 } = await pool.request().input('path', sql.NChar, path).input('ct', sql.NChar, ct).query(`
         SELECT Value FROM GSVC_${path}_D3
-        WHERE CERTNO = ${ct}
-    `;
+        WHERE CERTNO = @ct
+    `);
 
     const D1arr = D1.map(({ Value }, i) => ({ [i]: Value }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});

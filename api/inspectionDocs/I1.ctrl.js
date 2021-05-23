@@ -68,9 +68,9 @@ exports.inspection = async (req, res) => {
       if (!magamYn[0].MagamYn) {
         await pool.request().query`
         INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
-        VALUES (${H.CERTNO || CERTNO[0]['']}, 'I-1', 1, 1, ${ID}, ${ID})
+        VALUES (${CERTNO[0]['']}, 'I-1', 1, 1, ${ID}, ${ID})
 
-        UPDATE GRCV_CT SET Cert_No = ${H.CERTNO || CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
+        UPDATE GRCV_CT SET Cert_No = ${CERTNO[0]['']}, MagamYn = 0, IN_ID = ${ID}
         WHERE (RcvNo = ${RCVNO} AND Doc_No = 'I-1')
       `;
       }
@@ -132,9 +132,9 @@ exports.inspection = async (req, res) => {
     Object.values(D1).forEach(async (v, i) => {
       const MFGDt = moment(v.MFGDt).format('YYYY-MM');
       await pool.request().query`
-        INSERT (CERTNO, CERTSEQ, CylnType, Type, MFGDt, SerialNo, Pressure, Perform, IN_ID, IN_DT, UP_ID) VALUES(${H.CERTNO || CERTNO[0]['']}, ${
-        i + 1
-      }, ${v.CylnType}, ${v.Type}, ${MFGDt}, ${v.SerialNo}, ${v.Pressure}, ${v.Perform},  ${ID}, ${insertDt}, ${ID});
+        INSERT [GSVC_I-1_D1] (CERTNO, CERTSEQ, CylnType, Type, MFGDt, SerialNo, Pressure, Perform, IN_ID, IN_DT, UP_ID) VALUES(${
+          H.CERTNO || CERTNO[0]['']
+        }, ${i + 1}, ${v.CylnType}, ${v.Type}, ${MFGDt}, ${v.SerialNo}, ${v.Pressure}, ${v.Perform},  ${ID}, ${insertDt}, ${ID});
       `;
     });
 

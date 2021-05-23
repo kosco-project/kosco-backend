@@ -43,7 +43,7 @@ exports.inspection = async (req, res) => {
   const ID = jwt.decode(token).userId;
   const { H, D1, D2 } = req.body;
   const { type } = req.params;
-  const { SHIPNM, RCVNO } = H;
+  const { VESSELNM, RCVNO } = H;
   const CERTDT = new Date().toFormat('YYYYMMDD');
 
   const pool = await sql.connect(config);
@@ -57,6 +57,7 @@ exports.inspection = async (req, res) => {
       SELECT MagamYn FROM GRCV_CT
       WHERE (RcvNo = ${RCVNO} AND Doc_No = 'P1')
     `;
+      console.log(H);
 
       if (!magamYn[0].MagamYn) {
         await pool.request().query`
@@ -89,12 +90,12 @@ exports.inspection = async (req, res) => {
       WHEN MATCHED THEN
         UPDATE SET UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
-        INSERT (CERTNO, CERTDT, ShipNm, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${CERTDT}, ${SHIPNM}, ${ID}, ${ID});
+        INSERT (CERTNO, CERTDT, ShipNm, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, ${CERTDT}, ${VESSELNM}, ${ID}, ${ID});
 
       MERGE INTO GSVC_P1_D2
         USING (values (1)) AS Source (Number)
         ON (CERTNO = ${H.CERTNO})
-      WHEN MATCHED AND (Value != ${D2}) THEN
+      WHEN MATCHED THEN
         UPDATE SET Value = ${D2}, UP_ID = ${ID}, UP_DT = getDate()
       WHEN NOT MATCHED THEN
         INSERT (CERTNO, CERTSEQ, Value, IN_ID, UP_ID) VALUES (${CERTNO[0]['']}, 1, ${D2}, ${ID}, ${ID});
@@ -122,9 +123,8 @@ exports.inspection = async (req, res) => {
 
     Object.values(D1).forEach(async (v, i) => {
       await pool.request().query`
-        INSERT (CERTNO, CERTSEQ, ProductType, Qty, Size, Perform, IN_ID, IN_DT, UP_ID) VALUES (${CERTNO[0]['']}, ${i + 1}, ${v.ProductType}, ${
-        v.Qty
-      }, ${v.Size}, ${v.Perform}, ${ID}, ${insertDt}, ${ID});
+        INSERT GSVC_P1_D1 (CERTNO, CERTSEQ, ProductType, Qty, Size, Perform, IN_ID, IN_DT, UP_ID)
+        VALUES (${H.CERTNO || CERTNO[0]['']}, ${i + 1}, ${v.ProductType}, ${v.Qty}, ${v.Size}, ${v.Perform}, ${ID}, ${insertDt}, ${ID});
       `;
     });
 

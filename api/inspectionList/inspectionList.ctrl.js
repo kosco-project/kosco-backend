@@ -9,6 +9,7 @@ exports.find = async (req, res) => {
   const token = req.headers.authorization.slice(7);
   const { process: processValue } = req.params;
   let { startDate, endDate } = req.params;
+  const { sch_type, sch_keyword } = req.query;
 
   startDate = startDate.split('-').join('');
   endDate = endDate.split('-').join('');
@@ -79,7 +80,14 @@ exports.find = async (req, res) => {
         ORDER BY CUSTNM, RCVDT
       `;
 
-    res.send({ message: 'find success', list: recordset });
+    // 검색했을 경우
+    if (sch_type) {
+      const filter_list = recordset.filter(list => list[sch_type].includes(sch_keyword));
+      res.send({ message: 'find success', list_info: { list: filter_list, total_pages: filter_list.length } });
+    } else {
+      // 검색어가 없을 경우
+      res.send({ message: 'find success', list_info: { list: recordset, total_pages: recordset.length } });
+    }
   } catch (e) {
     console.error(e);
     if (e.name === 'TokenExpiredError') {

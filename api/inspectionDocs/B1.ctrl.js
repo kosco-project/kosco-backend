@@ -68,7 +68,7 @@ exports.inspection = async (req, res) => {
 
     if (!magamYn[0].MagamYn) {
       await pool.request().query`
-        INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+        INSERT GDOC_3 (Cert_No, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
         VALUES (${CERTNO[0]['']}, 'B1', 1, 1, ${ID}, ${ID})
       `;
     }

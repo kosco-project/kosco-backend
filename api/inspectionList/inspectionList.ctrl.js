@@ -82,7 +82,7 @@ exports.find = async (req, res) => {
 
     // 검색했을 경우
     if (sch_type) {
-      const filter_list = recordset.filter(list => list[sch_type].includes(sch_keyword));
+      const filter_list = recordset.filter(list => !list[sch_type].search(new RegExp(sch_keyword, 'i')));
       res.send({ message: 'find success', list_info: { list: filter_list, total_pages: filter_list.length } });
     } else {
       // 검색어가 없을 경우

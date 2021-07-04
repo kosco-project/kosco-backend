@@ -28,18 +28,16 @@ exports.details = async (req, res) => {
     }));
     const D1obj = D1arr.reduce((a, c) => ({ ...a, ...c }), {});
 
-    const D2arr = D2.map((item, i) => {
+    const D2arr = D2.map(item => {
       const { confirm, f_pressure, f_depth, expiry_date, value1, value2, recommend } = item;
       return {
-        [i]: {
-          confirm,
-          f_pressure,
-          f_depth,
-          expiry_date,
-          value1,
-          value2,
-          recommend,
-        },
+        confirm,
+        f_pressure,
+        f_depth,
+        expiry_date,
+        value1,
+        value2,
+        recommend,
       };
     });
     const D2obj = D2arr.reduce((a, c) => ({ ...a, ...c }), {});

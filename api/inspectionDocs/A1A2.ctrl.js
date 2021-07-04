@@ -102,7 +102,7 @@ exports.inspection = async (req, res) => {
         .request()
         .input('CERTNO', sql.NChar, H.CERTNO || CERTNO[0][''])
         .input('path', sql.NChar, path).query(`
-      INSERT GDOC_3 (Cert_NO, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
+      INSERT GDOC_3 (Cert_No, Doc_No, Doc_Seq, Seq, IN_ID, UP_ID)
       VALUES (@CERTNO, @path, 1, 1, ${ID}, ${ID})
     `);
     }
